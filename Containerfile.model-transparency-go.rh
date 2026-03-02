@@ -14,7 +14,10 @@ WORKDIR /opt/app-root/src
 
 COPY . .
 
+RUN go mod vendor
+
 RUN set -euo pipefail; \
+    NATIVE_ARCH="$(go env GOARCH)"; \
     GIT_VERSION="$(git describe --tags --always --dirty 2>/dev/null || echo v0.0.0)"; \
     GIT_HASH="$(git rev-parse HEAD 2>/dev/null || echo unknown)"; \
     GIT_TREESTATE="clean"; \
@@ -24,22 +27,26 @@ RUN set -euo pipefail; \
              -X sigs.k8s.io/release-utils/version.gitTreeState=${GIT_TREESTATE} \
              -X sigs.k8s.io/release-utils/version.buildDate=${BUILD_DATE} \
              -w -s"; \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags="${BUILD_TAGS}" -trimpath -ldflags "${LDFLAGS}" -o model_transparency_cli_linux_amd64 ./cmd/model-signing; \
-    gzip -k model_transparency_cli_linux_amd64; \
-    CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -tags="${BUILD_TAGS}" -trimpath -ldflags "${LDFLAGS}" -o model_transparency_cli_darwin_amd64 ./cmd/model-signing; \
+    CGO_ENABLED=1 go build -tags="${BUILD_TAGS}" -trimpath -ldflags "${LDFLAGS}" \
+        -o model_transparency_cli ./cmd/model-signing; \
+    cp model_transparency_cli "model_transparency_cli_linux_${NATIVE_ARCH}"; \
+    gzip -k "model_transparency_cli_linux_${NATIVE_ARCH}"; \
+    CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -tags="${BUILD_TAGS}" -trimpath -ldflags "${LDFLAGS}" \
+        -o model_transparency_cli_darwin_amd64 ./cmd/model-signing; \
     gzip model_transparency_cli_darwin_amd64; \
-    CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -tags="${BUILD_TAGS}" -trimpath -ldflags "${LDFLAGS}" -o model_transparency_cli_darwin_arm64 ./cmd/model-signing; \
+    CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -tags="${BUILD_TAGS}" -trimpath -ldflags "${LDFLAGS}" \
+        -o model_transparency_cli_darwin_arm64 ./cmd/model-signing; \
     gzip model_transparency_cli_darwin_arm64; \
-    CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -tags="${BUILD_TAGS}" -trimpath -ldflags "${LDFLAGS}" -o model_transparency_cli_windows_amd64.exe ./cmd/model-signing; \
+    CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -tags="${BUILD_TAGS}" -trimpath -ldflags "${LDFLAGS}" \
+        -o model_transparency_cli_windows_amd64.exe ./cmd/model-signing; \
     gzip model_transparency_cli_windows_amd64.exe
 
 FROM registry.redhat.io/ubi9/ubi-minimal@sha256:c7d44146f826037f6873d99da479299b889473492d3c1ab8af86f08af04ec8a0 AS deploy
 
-COPY --from=build-env /opt/app-root/src/model_transparency_cli_linux_amd64 /usr/local/bin/model_transparency_cli_linux_amd64
-COPY --from=build-env /opt/app-root/src/model_transparency_cli_linux_amd64.gz /usr/local/bin/model_transparency_cli_linux_amd64.gz
-COPY --from=build-env /opt/app-root/src/model_transparency_cli_darwin_amd64.gz /usr/local/bin/model_transparency_cli_darwin_amd64.gz
-COPY --from=build-env /opt/app-root/src/model_transparency_cli_darwin_arm64.gz /usr/local/bin/model_transparency_cli_darwin_arm64.gz
-COPY --from=build-env /opt/app-root/src/model_transparency_cli_windows_amd64.exe.gz /usr/local/bin/model_transparency_cli_windows_amd64.exe.gz
+COPY --from=build-env /opt/app-root/src/model_transparency_cli /usr/local/bin/model_transparency_cli
+COPY --from=build-env /opt/app-root/src/model_transparency_cli_linux_*.gz /usr/local/bin/
+COPY --from=build-env /opt/app-root/src/model_transparency_cli_darwin_*.gz /usr/local/bin/
+COPY --from=build-env /opt/app-root/src/model_transparency_cli_windows_*.gz /usr/local/bin/
 
 COPY LICENSE /licenses/license.txt
 
@@ -47,7 +54,7 @@ WORKDIR /opt/app-root/src/home
 
 USER 65532:65532
 
-ENTRYPOINT ["model_transparency_cli_linux_amd64"]
+ENTRYPOINT ["model_transparency_cli"]
 CMD ["--help"]
 
 LABEL description="Supply chain security for ML"

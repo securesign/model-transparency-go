@@ -34,9 +34,9 @@ COLOR_YELLOW=\033[33m
 COLOR_BLUE=\033[34m
 
 .PHONY: all build clean test test-unit test-ci test-coverage coverage-report help deps vet fmt fmt-check lint \
-	docker-build podman-build container-build build-test-binary build-test-binary-otel \
+	docker-build podman-build container-build build-test-binary build-test-binary-otel build-test-binary-pkcs11 \
 	mod-tidy-check license-check docs \
-	build-linux build-macos build-windows cross-platform
+	build-linux build-linux-pkcs11 build-macos build-windows cross-platform
 
 ## help: Display this help message
 help:
@@ -59,10 +59,11 @@ help:
 	@echo -e "  $(COLOR_GREEN)docs$(COLOR_RESET)            - Generate API documentation"
 	@echo -e "  $(COLOR_GREEN)container-build$(COLOR_RESET) - Build and verify container image"
 	@echo -e "  $(COLOR_GREEN)build-test-binary$(COLOR_RESET) - Build binary for integration tests"
-	@echo -e "  $(COLOR_GREEN)build-linux$(COLOR_RESET)     - Build CLI binary for Linux amd64"
-	@echo -e "  $(COLOR_GREEN)build-macos$(COLOR_RESET)     - Build CLI binaries for macOS amd64 and arm64"
-	@echo -e "  $(COLOR_GREEN)build-windows$(COLOR_RESET)   - Build CLI binary for Windows amd64"
-	@echo -e "  $(COLOR_GREEN)cross-platform$(COLOR_RESET)  - Build and gzip CLI binaries for all platforms"
+	@echo -e "  $(COLOR_GREEN)build-linux$(COLOR_RESET)          - Build CLI binary for Linux amd64"
+	@echo -e "  $(COLOR_GREEN)build-linux-pkcs11$(COLOR_RESET)   - Build CLI for Linux amd64 with PKCS#11 (CGO)"
+	@echo -e "  $(COLOR_GREEN)build-macos$(COLOR_RESET)          - Build CLI binaries for macOS amd64 and arm64"
+	@echo -e "  $(COLOR_GREEN)build-windows$(COLOR_RESET)        - Build CLI binary for Windows amd64"
+	@echo -e "  $(COLOR_GREEN)cross-platform$(COLOR_RESET)       - Build and gzip CLI binaries for all platforms"
 	@echo ""
 	@echo -e "$(COLOR_BOLD)Examples:$(COLOR_RESET)"
 	@echo "  make build              # Build the binary"
@@ -82,12 +83,19 @@ build:
 	$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_NAME) -v $(BINARY_PATH)
 	@echo "$(COLOR_GREEN)✓ Binary built: $(BUILD_DIR)/$(BINARY_NAME)$(COLOR_RESET)"
 
-## build-linux: Build for Linux amd64
+## build-linux: Build for Linux amd64 (default, no PKCS#11)
 build-linux:
 	@echo "$(COLOR_BLUE)Building $(BINARY_CLI_NAME) for Linux...$(COLOR_RESET)"
 	@mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) -trimpath -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_CLI_NAME)_linux_amd64 $(BINARY_PATH)
 	@echo "$(COLOR_GREEN)✓ Binary built: $(BUILD_DIR)/$(BINARY_CLI_NAME)_linux_amd64$(COLOR_RESET)"
+
+## build-linux-pkcs11: Build for Linux amd64 with PKCS#11/HSM support (requires CGO)
+build-linux-pkcs11:
+	@echo "$(COLOR_BLUE)Building $(BINARY_CLI_NAME) for Linux with PKCS#11...$(COLOR_RESET)"
+	@mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 $(GOBUILD) -tags=pkcs11 -trimpath -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_CLI_NAME)_linux_amd64 $(BINARY_PATH)
+	@echo "$(COLOR_GREEN)✓ Binary built: $(BUILD_DIR)/$(BINARY_CLI_NAME)_linux_amd64 (with PKCS#11)$(COLOR_RESET)"
 
 ## build-macos: Build for macOS amd64 and arm64
 build-macos:
@@ -107,10 +115,10 @@ build-windows:
 ## cross-platform: Build and gzip for all platforms
 cross-platform: build-linux build-macos build-windows
 	@echo "$(COLOR_BLUE)Compressing binaries...$(COLOR_RESET)"
-	gzip -k $(BUILD_DIR)/$(BINARY_CLI_NAME)_linux_amd64
-	gzip -k $(BUILD_DIR)/$(BINARY_CLI_NAME)_darwin_amd64
-	gzip -k $(BUILD_DIR)/$(BINARY_CLI_NAME)_darwin_arm64
-	gzip -k $(BUILD_DIR)/$(BINARY_CLI_NAME)_windows_amd64.exe
+	gzip -k -f $(BUILD_DIR)/$(BINARY_CLI_NAME)_linux_amd64
+	gzip -k -f $(BUILD_DIR)/$(BINARY_CLI_NAME)_darwin_amd64
+	gzip -k -f $(BUILD_DIR)/$(BINARY_CLI_NAME)_darwin_arm64
+	gzip -k -f $(BUILD_DIR)/$(BINARY_CLI_NAME)_windows_amd64.exe
 	@echo "$(COLOR_GREEN)✓ All platform binaries built and compressed in $(BUILD_DIR)/$(COLOR_RESET)"
 
 ## clean: Clean build artifacts and coverage reports
@@ -279,6 +287,12 @@ build-test-binary-otel:
 	@echo "$(COLOR_BLUE)Building test binary with OTel...$(COLOR_RESET)"
 	$(GOBUILD) -tags=otel -o scripts/tests/$(BINARY_NAME) $(BINARY_PATH)
 	@echo "$(COLOR_GREEN)✓ OTel test binary built: scripts/tests/$(BINARY_NAME)$(COLOR_RESET)"
+
+## build-test-binary-pkcs11: Build binary with PKCS#11 for integration tests
+build-test-binary-pkcs11:
+	@echo "$(COLOR_BLUE)Building test binary with PKCS#11...$(COLOR_RESET)"
+	CGO_ENABLED=1 $(GOBUILD) -tags=pkcs11 -o scripts/tests/$(BINARY_NAME) $(BINARY_PATH)
+	@echo "$(COLOR_GREEN)✓ PKCS#11 test binary built: scripts/tests/$(BINARY_NAME)$(COLOR_RESET)"
 
 ## container-build: Build and verify container image
 container-build:
