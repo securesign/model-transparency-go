@@ -3,7 +3,7 @@
 
 # Go parameters
 GOCMD=go
-GOBUILD=CGO_ENABLED=1 $(GOCMD) build
+GOBUILD=$(GOCMD) build
 GOTEST=$(GOCMD) test
 GOGET=$(GOCMD) get
 GOMOD=$(GOCMD) mod
@@ -13,6 +13,7 @@ GOFMT=gofmt
 
 # Binary name
 BINARY_NAME=model-signing
+BINARY_CLI_NAME=model_transparency_cli
 BINARY_PATH=./cmd/model-signing
 
 # Build output directory
@@ -34,7 +35,8 @@ COLOR_BLUE=\033[34m
 
 .PHONY: all build clean test test-unit test-ci test-coverage coverage-report help deps vet fmt fmt-check lint \
 	docker-build podman-build container-build build-test-binary build-test-binary-otel \
-	mod-tidy-check license-check docs
+	mod-tidy-check license-check docs \
+	build-linux build-macos build-windows cross-platform
 
 ## help: Display this help message
 help:
@@ -57,6 +59,10 @@ help:
 	@echo -e "  $(COLOR_GREEN)docs$(COLOR_RESET)            - Generate API documentation"
 	@echo -e "  $(COLOR_GREEN)container-build$(COLOR_RESET) - Build and verify container image"
 	@echo -e "  $(COLOR_GREEN)build-test-binary$(COLOR_RESET) - Build binary for integration tests"
+	@echo -e "  $(COLOR_GREEN)build-linux$(COLOR_RESET)     - Build CLI binary for Linux amd64"
+	@echo -e "  $(COLOR_GREEN)build-macos$(COLOR_RESET)     - Build CLI binaries for macOS amd64 and arm64"
+	@echo -e "  $(COLOR_GREEN)build-windows$(COLOR_RESET)   - Build CLI binary for Windows amd64"
+	@echo -e "  $(COLOR_GREEN)cross-platform$(COLOR_RESET)  - Build and gzip CLI binaries for all platforms"
 	@echo ""
 	@echo -e "$(COLOR_BOLD)Examples:$(COLOR_RESET)"
 	@echo "  make build              # Build the binary"
@@ -76,20 +82,36 @@ build:
 	$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_NAME) -v $(BINARY_PATH)
 	@echo "$(COLOR_GREEN)✓ Binary built: $(BUILD_DIR)/$(BINARY_NAME)$(COLOR_RESET)"
 
-## build-linux: Build for Linux
+## build-linux: Build for Linux amd64
 build-linux:
-	@echo "$(COLOR_BLUE)Building $(BINARY_NAME) for Linux...$(COLOR_RESET)"
+	@echo "$(COLOR_BLUE)Building $(BINARY_CLI_NAME) for Linux...$(COLOR_RESET)"
 	@mkdir -p $(BUILD_DIR)
-	GOOS=linux GOARCH=amd64 $(GOBUILD) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64 -v $(BINARY_PATH)
-	@echo "$(COLOR_GREEN)✓ Binary built: $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64$(COLOR_RESET)"
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) -trimpath -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_CLI_NAME)_linux_amd64 $(BINARY_PATH)
+	@echo "$(COLOR_GREEN)✓ Binary built: $(BUILD_DIR)/$(BINARY_CLI_NAME)_linux_amd64$(COLOR_RESET)"
 
-## build-macos: Build for macOS
+## build-macos: Build for macOS amd64 and arm64
 build-macos:
-	@echo "$(COLOR_BLUE)Building $(BINARY_NAME) for macOS...$(COLOR_RESET)"
+	@echo "$(COLOR_BLUE)Building $(BINARY_CLI_NAME) for macOS...$(COLOR_RESET)"
 	@mkdir -p $(BUILD_DIR)
-	GOOS=darwin GOARCH=amd64 $(GOBUILD) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64 -v $(BINARY_PATH)
-	GOOS=darwin GOARCH=arm64 $(GOBUILD) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64 -v $(BINARY_PATH)
-	@echo "$(COLOR_GREEN)✓ Binaries built: $(BUILD_DIR)/$(BINARY_NAME)-darwin-*$(COLOR_RESET)"
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(GOBUILD) -trimpath -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_CLI_NAME)_darwin_amd64 $(BINARY_PATH)
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(GOBUILD) -trimpath -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_CLI_NAME)_darwin_arm64 $(BINARY_PATH)
+	@echo "$(COLOR_GREEN)✓ Binaries built: $(BUILD_DIR)/$(BINARY_CLI_NAME)_darwin_*$(COLOR_RESET)"
+
+## build-windows: Build for Windows amd64
+build-windows:
+	@echo "$(COLOR_BLUE)Building $(BINARY_CLI_NAME) for Windows...$(COLOR_RESET)"
+	@mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(GOBUILD) -trimpath -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_CLI_NAME)_windows_amd64.exe $(BINARY_PATH)
+	@echo "$(COLOR_GREEN)✓ Binary built: $(BUILD_DIR)/$(BINARY_CLI_NAME)_windows_amd64.exe$(COLOR_RESET)"
+
+## cross-platform: Build and gzip for all platforms
+cross-platform: build-linux build-macos build-windows
+	@echo "$(COLOR_BLUE)Compressing binaries...$(COLOR_RESET)"
+	gzip -k $(BUILD_DIR)/$(BINARY_CLI_NAME)_linux_amd64
+	gzip -k $(BUILD_DIR)/$(BINARY_CLI_NAME)_darwin_amd64
+	gzip -k $(BUILD_DIR)/$(BINARY_CLI_NAME)_darwin_arm64
+	gzip -k $(BUILD_DIR)/$(BINARY_CLI_NAME)_windows_amd64.exe
+	@echo "$(COLOR_GREEN)✓ All platform binaries built and compressed in $(BUILD_DIR)/$(COLOR_RESET)"
 
 ## clean: Clean build artifacts and coverage reports
 clean:
