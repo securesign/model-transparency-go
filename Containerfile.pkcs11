@@ -19,7 +19,7 @@
 # For hardware HSMs, bind-mount your vendor's PKCS#11 module at runtime
 # and pass the module path via --pkcs11-uri module-path attribute.
 
-FROM golang:1.25.7@sha256:931c889bca758a82fcbfcb1b6ed6ca1de30783e9e52e6093ad50060735cb99be AS builder
+FROM golang:1.25.7@sha256:5a79b94c34c299ac0361fbb7c7fca6dc552e166b42341050323fa3ab137d7be9 AS builder
 
 # Optional Go build tags (e.g. "otel" for OpenTelemetry support).
 # Default (empty) produces a standard build without optional features.
@@ -40,7 +40,8 @@ COPY cmd/ cmd/
 COPY pkg/ pkg/
 
 # CGO required for PKCS#11 (crypto11 uses cgo bindings)
-RUN CGO_ENABLED=1 GOOS=linux go build -tags="${BUILD_TAGS}" -ldflags="-s -w" -o /usr/local/bin/model-signing ./cmd/model-signing
+# Always include pkcs11 tag; BUILD_TAGS adds optional extras (e.g. otel).
+RUN CGO_ENABLED=1 GOOS=linux go build -tags="pkcs11${BUILD_TAGS:+,${BUILD_TAGS}}" -trimpath -ldflags="-s -w" -o /usr/local/bin/model-signing ./cmd/model-signing
 
 # Debian slim for glibc compatibility with PKCS#11 shared libraries
 FROM debian:bookworm-slim AS deploy

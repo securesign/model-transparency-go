@@ -35,7 +35,7 @@ COLOR_BLUE=\033[34m
 
 .PHONY: all build clean test test-unit test-ci test-coverage coverage-report help deps vet fmt fmt-check lint \
 	docker-build podman-build container-build build-test-binary build-test-binary-otel build-test-binary-pkcs11 \
-	mod-tidy-check license-check docs \
+	mod-tidy-check license-check docs test-pkcs11 \
 	build-linux build-linux-pkcs11 build-macos build-windows cross-platform
 
 ## help: Display this help message
@@ -47,6 +47,7 @@ help:
 	@echo -e "  $(COLOR_GREEN)clean$(COLOR_RESET)           - Clean build artifacts and coverage reports"
 	@echo -e "  $(COLOR_GREEN)test$(COLOR_RESET)            - Run all tests"
 	@echo -e "  $(COLOR_GREEN)test-unit$(COLOR_RESET)       - Run unit tests only (faster)"
+	@echo -e "  $(COLOR_GREEN)test-pkcs11$(COLOR_RESET)    - Run PKCS#11 unit tests (requires CGO)"
 	@echo -e "  $(COLOR_GREEN)test-coverage$(COLOR_RESET)   - Run tests with coverage report"
 	@echo -e "  $(COLOR_GREEN)coverage-report$(COLOR_RESET) - Generate HTML coverage report"
 	@echo -e "  $(COLOR_GREEN)vet$(COLOR_RESET)             - Run go vet"
@@ -87,7 +88,7 @@ build:
 build-linux:
 	@echo "$(COLOR_BLUE)Building $(BINARY_CLI_NAME) for Linux...$(COLOR_RESET)"
 	@mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) -trimpath -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_CLI_NAME)_linux_amd64 $(BINARY_PATH)
+	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 $(GOBUILD) -trimpath -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_CLI_NAME)_linux_amd64 $(BINARY_PATH)
 	@echo "$(COLOR_GREEN)✓ Binary built: $(BUILD_DIR)/$(BINARY_CLI_NAME)_linux_amd64$(COLOR_RESET)"
 
 ## build-linux-pkcs11: Build for Linux amd64 with PKCS#11/HSM support (requires CGO)
@@ -147,6 +148,12 @@ test-unit:
 	@echo "$(COLOR_BLUE)Running unit tests...$(COLOR_RESET)"
 	$(GOTEST) -v -short -timeout $(TEST_TIMEOUT) $(TEST_PACKAGES)
 	@echo "$(COLOR_GREEN)✓ Unit tests passed$(COLOR_RESET)"
+
+## test-pkcs11: Run PKCS#11 unit tests (requires CGO)
+test-pkcs11:
+	@echo "$(COLOR_BLUE)Running PKCS#11 unit tests...$(COLOR_RESET)"
+	CGO_ENABLED=1 $(GOTEST) -v -tags=pkcs11 -timeout $(TEST_TIMEOUT) ./pkg/signing/pkcs11/...
+	@echo "$(COLOR_GREEN)✓ PKCS#11 unit tests passed$(COLOR_RESET)"
 
 ## test-coverage: Run tests with coverage report
 test-coverage:
