@@ -3,7 +3,7 @@
 
 # Go parameters
 GOCMD=go
-GOBUILD=CGO_ENABLED=1 $(GOCMD) build
+GOBUILD=$(GOCMD) build
 GOTEST=$(GOCMD) test
 GOGET=$(GOCMD) get
 GOMOD=$(GOCMD) mod
@@ -100,7 +100,7 @@ build-linux-pkcs11:
 
 ## build-macos: Build for macOS amd64 and arm64
 build-macos:
-	@echo "$(COLOR_BLUE)Building $(BINARY_NAME) for macOS...$(COLOR_RESET)"
+	@echo "$(COLOR_BLUE)Building $(BINARY_CLI_NAME) for macOS...$(COLOR_RESET)"
 	@mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(GOBUILD) -trimpath -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_CLI_NAME)_darwin_amd64 $(BINARY_PATH)
 	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(GOBUILD) -trimpath -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_CLI_NAME)_darwin_arm64 $(BINARY_PATH)
