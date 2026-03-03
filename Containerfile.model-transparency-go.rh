@@ -39,7 +39,13 @@ RUN set -euo pipefail; \
     gzip model_transparency_cli_darwin_arm64; \
     CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -tags="${BUILD_TAGS}" -trimpath -ldflags "${LDFLAGS}" \
         -o model_transparency_cli_windows_amd64.exe ./cmd/model-signing; \
-    gzip model_transparency_cli_windows_amd64.exe
+    gzip model_transparency_cli_windows_amd64.exe; \
+    CGO_ENABLED=1 go build -tags="${BUILD_TAGS},pkcs11" -trimpath -ldflags "${LDFLAGS}" \
+        -o "model_transparency_cli_pkcs11_linux_${NATIVE_ARCH}" ./cmd/model-signing; \
+    gzip "model_transparency_cli_pkcs11_linux_${NATIVE_ARCH}"; \
+    CGO_ENABLED=1 go build -tags="${BUILD_TAGS},otel" -trimpath -ldflags "${LDFLAGS}" \
+        -o "model_transparency_cli_otel_linux_${NATIVE_ARCH}" ./cmd/model-signing; \
+    gzip "model_transparency_cli_otel_linux_${NATIVE_ARCH}"
 
 FROM registry.redhat.io/ubi9/ubi-minimal@sha256:c7d44146f826037f6873d99da479299b889473492d3c1ab8af86f08af04ec8a0 AS deploy
 
@@ -47,6 +53,8 @@ COPY --from=build-env /opt/app-root/src/model_transparency_cli /usr/local/bin/mo
 COPY --from=build-env /opt/app-root/src/model_transparency_cli_linux_*.gz /usr/local/bin/
 COPY --from=build-env /opt/app-root/src/model_transparency_cli_darwin_*.gz /usr/local/bin/
 COPY --from=build-env /opt/app-root/src/model_transparency_cli_windows_*.gz /usr/local/bin/
+COPY --from=build-env /opt/app-root/src/model_transparency_cli_pkcs11_linux_*.gz /usr/local/bin/
+COPY --from=build-env /opt/app-root/src/model_transparency_cli_otel_linux_*.gz /usr/local/bin/
 
 COPY LICENSE /licenses/license.txt
 
