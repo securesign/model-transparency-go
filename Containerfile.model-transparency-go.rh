@@ -30,31 +30,31 @@ RUN set -euo pipefail; \
     CGO_ENABLED=1 go build -tags="${BUILD_TAGS}" -trimpath -ldflags "${LDFLAGS}" \
         -o model_transparency_cli ./cmd/model-signing; \
     cp model_transparency_cli "model_transparency_cli_linux_${NATIVE_ARCH}"; \
-    tar czf "model_transparency_cli_linux_${NATIVE_ARCH}.gz" "model_transparency_cli_linux_${NATIVE_ARCH}"; \
+    tar czf "model_transparency_cli_linux_${NATIVE_ARCH}.tar.gz" "model_transparency_cli_linux_${NATIVE_ARCH}"; \
     CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -tags="${BUILD_TAGS}" -trimpath -ldflags "${LDFLAGS}" \
         -o model_transparency_cli_darwin_amd64 ./cmd/model-signing; \
-    tar czf model_transparency_cli_darwin_amd64.gz model_transparency_cli_darwin_amd64; \
+    tar czf model_transparency_cli_darwin_amd64.tar.gz model_transparency_cli_darwin_amd64; \
     CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -tags="${BUILD_TAGS}" -trimpath -ldflags "${LDFLAGS}" \
         -o model_transparency_cli_darwin_arm64 ./cmd/model-signing; \
-    tar czf model_transparency_cli_darwin_arm64.gz model_transparency_cli_darwin_arm64; \
+    tar czf model_transparency_cli_darwin_arm64.tar.gz model_transparency_cli_darwin_arm64; \
     CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -tags="${BUILD_TAGS}" -trimpath -ldflags "${LDFLAGS}" \
         -o model_transparency_cli_windows_amd64.exe ./cmd/model-signing; \
     tar czf model_transparency_cli_windows_amd64.exe.gz model_transparency_cli_windows_amd64.exe; \
     CGO_ENABLED=1 go build -tags="${BUILD_TAGS},pkcs11" -trimpath -ldflags "${LDFLAGS}" \
         -o "model_transparency_cli_pkcs11_linux_${NATIVE_ARCH}" ./cmd/model-signing; \
-    tar czf "model_transparency_cli_pkcs11_linux_${NATIVE_ARCH}.gz" "model_transparency_cli_pkcs11_linux_${NATIVE_ARCH}"; \
+    tar czf "model_transparency_cli_pkcs11_linux_${NATIVE_ARCH}.tar.gz" "model_transparency_cli_pkcs11_linux_${NATIVE_ARCH}"; \
     CGO_ENABLED=1 go build -tags="${BUILD_TAGS},otel" -trimpath -ldflags "${LDFLAGS}" \
         -o "model_transparency_cli_otel_linux_${NATIVE_ARCH}" ./cmd/model-signing; \
-    tar czf "model_transparency_cli_otel_linux_${NATIVE_ARCH}.gz" "model_transparency_cli_otel_linux_${NATIVE_ARCH}"
+    tar czf "model_transparency_cli_otel_linux_${NATIVE_ARCH}.tar.gz" "model_transparency_cli_otel_linux_${NATIVE_ARCH}"
 
 FROM registry.redhat.io/ubi9/ubi-minimal@sha256:c7d44146f826037f6873d99da479299b889473492d3c1ab8af86f08af04ec8a0 AS deploy
 
 COPY --from=build-env /opt/app-root/src/model_transparency_cli /usr/local/bin/model_transparency_cli
-COPY --from=build-env /opt/app-root/src/model_transparency_cli_linux_*.gz /usr/local/bin/
-COPY --from=build-env /opt/app-root/src/model_transparency_cli_darwin_*.gz /usr/local/bin/
-COPY --from=build-env /opt/app-root/src/model_transparency_cli_windows_*.gz /usr/local/bin/
-COPY --from=build-env /opt/app-root/src/model_transparency_cli_pkcs11_linux_*.gz /usr/local/bin/
-COPY --from=build-env /opt/app-root/src/model_transparency_cli_otel_linux_*.gz /usr/local/bin/
+COPY --from=build-env /opt/app-root/src/model_transparency_cli_linux_*.tar.gz /usr/local/bin/
+COPY --from=build-env /opt/app-root/src/model_transparency_cli_darwin_*.tar.gz /usr/local/bin/
+COPY --from=build-env /opt/app-root/src/model_transparency_cli_windows_*.exe.gz /usr/local/bin/
+COPY --from=build-env /opt/app-root/src/model_transparency_cli_pkcs11_linux_*.tar.gz /usr/local/bin/
+COPY --from=build-env /opt/app-root/src/model_transparency_cli_otel_linux_*.tar.gz /usr/local/bin/
 
 COPY LICENSE /licenses/license.txt
 
