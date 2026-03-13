@@ -16,7 +16,7 @@ name: OCI Manifest Tests
 
 on:
   pull_request:
-    branches: [main]
+    branches: [tech-preview]
     types: [opened, synchronize]
     paths-ignore:
       - '**/*.md'
