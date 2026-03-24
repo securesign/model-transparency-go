@@ -15,10 +15,10 @@ metadata:
       )
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: model-transparency-go
-    appstudio.openshift.io/component: model-transparency-go
+    appstudio.openshift.io/application: model-transparency-go-tech-preview
+    appstudio.openshift.io/component: model-transparency-go-tech-preview
     pipelines.appstudio.openshift.io/type: build
-  name: model-transparency-go-on-pull-request
+  name: model-transparency-go-tech-preview-on-pull-request
   namespace: rhtas-tenant
 spec:
   params:
@@ -54,6 +54,8 @@ spec:
     value:
       - linux/x86_64
       - linux/arm64
+      - linux/ppc64le
+      - linux/s390x
   - name: image-expires-after
     value: 5d
   - name: fips-check
@@ -75,7 +77,7 @@ spec:
           memory: 5Gi
       name: run-tests
   taskRunTemplate:
-    serviceAccountName: build-pipeline-model-transparency-go
+    serviceAccountName: build-pipeline-model-transparency-go-tech-preview
   workspaces:
   - name: git-auth
     secret:
