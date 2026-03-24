@@ -1,0 +1,49 @@
+FROM --platform=linux/amd64   quay.io/securesign/model-transparency-go@sha256:b391be1aa65d8370ee7270f17148491c63a85e1abd96bc3157ef55e2887019c8 AS build-amd64
+FROM --platform=linux/arm64   quay.io/securesign/model-transparency-go@sha256:c7ff178d83fff03b11c69ca4efe83d4eb6672f192e1b6bb599d923b8c15702c2 AS build-arm64
+FROM --platform=linux/ppc64le quay.io/securesign/model-transparency-go@sha256:abeb0b357fda21040b93a53bf66837596d7367ed854fea9d8dfc38f0f8e3fa61 AS build-ppc64le
+FROM --platform=linux/s390x   quay.io/securesign/model-transparency-go@sha256:8b95c31ac1fd91d2c7fece670881a9bdca75f46dd6c542c4b083415520a1f32b AS build-s390x
+
+FROM registry.redhat.io/ubi9/ubi-minimal@sha256:69f5c9886ecb19b23e88275a5cd904c47dd982dfa370fbbd0c356d7b1047ef68 AS packager
+USER root
+RUN mkdir -p /binaries
+
+# Native Linux binaries from each arch variant
+COPY --from=build-amd64   /usr/local/bin/model_transparency_cli_linux_amd64.tar.gz /binaries/
+COPY --from=build-arm64   /usr/local/bin/model_transparency_cli_linux_arm64.tar.gz /binaries/
+COPY --from=build-ppc64le /usr/local/bin/model_transparency_cli_linux_ppc64le.tar.gz /binaries/
+COPY --from=build-s390x   /usr/local/bin/model_transparency_cli_linux_s390x.tar.gz /binaries/
+
+# PKCS11 variants
+COPY --from=build-amd64   /usr/local/bin/model_transparency_cli_pkcs11_linux_amd64.tar.gz /binaries/
+COPY --from=build-arm64   /usr/local/bin/model_transparency_cli_pkcs11_linux_arm64.tar.gz /binaries/
+COPY --from=build-ppc64le /usr/local/bin/model_transparency_cli_pkcs11_linux_ppc64le.tar.gz /binaries/
+COPY --from=build-s390x   /usr/local/bin/model_transparency_cli_pkcs11_linux_s390x.tar.gz /binaries/
+
+# OTel variants
+COPY --from=build-amd64   /usr/local/bin/model_transparency_cli_otel_linux_amd64.tar.gz /binaries/
+COPY --from=build-arm64   /usr/local/bin/model_transparency_cli_otel_linux_arm64.tar.gz /binaries/
+COPY --from=build-ppc64le /usr/local/bin/model_transparency_cli_otel_linux_ppc64le.tar.gz /binaries/
+COPY --from=build-s390x   /usr/local/bin/model_transparency_cli_otel_linux_s390x.tar.gz /binaries/
+
+# Cross-compiled binaries (same across all variants, taken from amd64)
+COPY --from=build-amd64 /usr/local/bin/model_transparency_cli_darwin_amd64.tar.gz /binaries/
+COPY --from=build-amd64 /usr/local/bin/model_transparency_cli_darwin_arm64.tar.gz /binaries/
+COPY --from=build-amd64 /usr/local/bin/model_transparency_cli_windows_amd64.exe.gz /binaries/
+
+# Final minimal image with all binaries
+FROM registry.redhat.io/ubi9/ubi-minimal@sha256:69f5c9886ecb19b23e88275a5cd904c47dd982dfa370fbbd0c356d7b1047ef68
+
+LABEL description="Flat image containing model-transparency CLI binaries for all platforms and architectures"
+LABEL io.k8s.description="Flat image containing model-transparency CLI binaries for all platforms and architectures"
+LABEL io.opencontainers.image.description="Flat image containing model-transparency CLI binaries for all platforms and architectures"
+LABEL io.k8s.display-name="Model Transparency CLI stack image for Red Hat Trusted Artifact Signer"
+LABEL io.openshift.tags="model-transparency trusted-artifact-signer cli-stack"
+LABEL summary="Provides model-transparency CLI binaries as tar.gz archives for CDN distribution."
+LABEL com.redhat.component="model-transparency-cli-stack"
+
+COPY --from=packager /binaries/ /binaries/
+COPY --from=build-amd64 /licenses/ /licenses/
+
+RUN chown -R root:0 /binaries && chmod -R g+r /binaries
+
+USER 65532:65532
