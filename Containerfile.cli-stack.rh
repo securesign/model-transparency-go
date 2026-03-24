@@ -1,9 +1,9 @@
-FROM --platform=linux/amd64   quay.io/securesign/model-transparency-go@sha256:b391be1aa65d8370ee7270f17148491c63a85e1abd96bc3157ef55e2887019c8 AS build-amd64
-FROM --platform=linux/arm64   quay.io/securesign/model-transparency-go@sha256:c7ff178d83fff03b11c69ca4efe83d4eb6672f192e1b6bb599d923b8c15702c2 AS build-arm64
-FROM --platform=linux/ppc64le quay.io/securesign/model-transparency-go@sha256:abeb0b357fda21040b93a53bf66837596d7367ed854fea9d8dfc38f0f8e3fa61 AS build-ppc64le
-FROM --platform=linux/s390x   quay.io/securesign/model-transparency-go@sha256:8b95c31ac1fd91d2c7fece670881a9bdca75f46dd6c542c4b083415520a1f32b AS build-s390x
+FROM --platform=linux/amd64   quay.io/securesign/model-transparency-go@sha256:e2ae81c9c25f7559f4c57cb2315270e646b0d0bb562d95623a5ac79d9a17b82a AS build-amd64
+FROM --platform=linux/arm64   quay.io/securesign/model-transparency-go@sha256:6e1f2200102a3cea9262b9770cf269e283e09499f4d65bc315d2798c3b0351a6 AS build-arm64
+FROM --platform=linux/ppc64le quay.io/securesign/model-transparency-go@sha256:834b7516426bc4c06d8463ad90a52d9897cd6e9314071bcdd1d9ac474c07ca3b AS build-ppc64le
+FROM --platform=linux/s390x   quay.io/securesign/model-transparency-go@sha256:99360a0c5567c24c7bf7aefb20b3dbdbe8610767212cbf7f44170aac45277e8b AS build-s390x
 
-FROM registry.redhat.io/ubi9/ubi-minimal@sha256:69f5c9886ecb19b23e88275a5cd904c47dd982dfa370fbbd0c356d7b1047ef68 AS packager
+FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:c7d44146f826037f6873d99da479299b889473492d3c1ab8af86f08af04ec8a0 AS packager
 USER root
 RUN mkdir -p /binaries
 
@@ -31,7 +31,7 @@ COPY --from=build-amd64 /usr/local/bin/model_transparency_cli_darwin_arm64.tar.g
 COPY --from=build-amd64 /usr/local/bin/model_transparency_cli_windows_amd64.exe.gz /binaries/
 
 # Final minimal image with all binaries
-FROM registry.redhat.io/ubi9/ubi-minimal@sha256:69f5c9886ecb19b23e88275a5cd904c47dd982dfa370fbbd0c356d7b1047ef68
+FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:c7d44146f826037f6873d99da479299b889473492d3c1ab8af86f08af04ec8a0
 
 LABEL description="Flat image containing model-transparency CLI binaries for all platforms and architectures"
 LABEL io.k8s.description="Flat image containing model-transparency CLI binaries for all platforms and architectures"
