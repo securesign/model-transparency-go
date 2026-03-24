@@ -15,13 +15,13 @@
 name: Lint
 on:
   pull_request:
-    branches: [main]
+    branches: [tech-preview]
     types: [opened, synchronize]
     paths-ignore:
       - '**/*.md'
       - '*.md'
   push:
-    branches: [main]
+    branches: [tech-preview]
   workflow_dispatch:
 
 permissions: {}
