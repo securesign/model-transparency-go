@@ -61,7 +61,7 @@ COPY LICENSE /licenses/license.txt
 WORKDIR /opt/app-root/src/home
 
 USER 65532:65532
-
+  
 ENTRYPOINT ["model_transparency_cli"]
 CMD ["--help"]
 
