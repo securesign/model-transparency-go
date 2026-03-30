@@ -3,7 +3,7 @@ FROM --platform=linux/arm64   quay.io/securesign/model-transparency-go@sha256:8d
 FROM --platform=linux/ppc64le quay.io/securesign/model-transparency-go@sha256:7fc4f54e4117638b81aefd3352522fbd65d0b2f7919d53b70977606a049454e6 AS build-ppc64le
 FROM --platform=linux/s390x   quay.io/securesign/model-transparency-go@sha256:c8920b94629ee1f8a66d407c481524f748015c3d1655afe58bac905f86572670 AS build-s390x
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:c7d44146f826037f6873d99da479299b889473492d3c1ab8af86f08af04ec8a0 AS packager
+FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:83006d535923fcf1345067873524a3980316f51794f01d8655be55d6e9387183 AS packager
 USER root
 RUN mkdir -p /binaries
 
@@ -31,7 +31,7 @@ COPY --from=build-amd64 /usr/local/bin/model_transparency_cli_darwin_arm64.tar.g
 COPY --from=build-amd64 /usr/local/bin/model_transparency_cli_windows_amd64.exe.gz /binaries/
 
 # Final minimal image with all binaries
-FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:c7d44146f826037f6873d99da479299b889473492d3c1ab8af86f08af04ec8a0
+FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:83006d535923fcf1345067873524a3980316f51794f01d8655be55d6e9387183
 
 LABEL description="Flat image containing model-transparency CLI binaries for all platforms and architectures"
 LABEL io.k8s.description="Flat image containing model-transparency CLI binaries for all platforms and architectures"
