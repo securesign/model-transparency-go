@@ -17,6 +17,7 @@ name: Unit Tests
 on: [push, pull_request]
 
 permissions:
+  id-token: write
   contents: read
 
 jobs:
@@ -40,6 +41,8 @@ jobs:
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
         with:
           files: ./coverage.out
+          flags: unit
+          use_oidc: true
           fail_ci_if_error: false
 
   test-pkcs11:
