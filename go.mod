@@ -1,6 +1,6 @@
 module github.com/sigstore/model-signing
 
-go 1.25.7
+go 1.25.9
 
 require (
 	github.com/ThalesGroup/crypto11 v1.6.0
