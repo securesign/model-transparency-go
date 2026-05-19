@@ -10,10 +10,10 @@ metadata:
       == "tech-preview"
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: cli-stacks
-    appstudio.openshift.io/component: model-transparency-cli-stack
+    appstudio.openshift.io/application: cli-stacks-v1-4
+    appstudio.openshift.io/component: model-transparency-cli-stack-v1-4
     pipelines.appstudio.openshift.io/type: build
-  name: model-transparency-cli-stack-on-push
+  name: model-transparency-cli-stack-v1-4-on-push
   namespace: rhtas-tenant
 spec:
   params:
