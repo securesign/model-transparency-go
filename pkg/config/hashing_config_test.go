@@ -15,10 +15,50 @@
 package config
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
+	"sync"
+	"syscall"
 	"testing"
+
+	"github.com/sigstore/model-signing/pkg/logging"
+	"github.com/sigstore/model-signing/pkg/utils"
 )
+
+type capturingLogger struct {
+	mu       sync.Mutex
+	warnings []string
+}
+
+func (l *capturingLogger) Debug(string, ...interface{}) {}
+func (l *capturingLogger) Debugln(string)               {}
+func (l *capturingLogger) Info(string, ...interface{})  {}
+func (l *capturingLogger) Infoln(string)                {}
+func (l *capturingLogger) Error(string, ...interface{}) {}
+func (l *capturingLogger) Errorln(string)               {}
+func (l *capturingLogger) GetLevel() logging.LogLevel   { return logging.LevelDebug }
+func (l *capturingLogger) Silent() bool                 { return false }
+func (l *capturingLogger) Warnln(msg string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.warnings = append(l.warnings, msg)
+}
+func (l *capturingLogger) Warn(format string, args ...interface{}) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.warnings = append(l.warnings, fmt.Sprintf(format, args...))
+}
+func (l *capturingLogger) WithField(string, interface{}) logging.Logger     { return l }
+func (l *capturingLogger) WithFields(map[string]interface{}) logging.Logger { return l }
+func (l *capturingLogger) Warnings() []string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return append([]string{}, l.warnings...)
+}
 
 func TestNewHashingConfig(t *testing.T) {
 	config := NewHashingConfig()
@@ -197,7 +237,7 @@ func TestSetIgnoredPaths_StoresInManifest(t *testing.T) {
 func TestAddIgnoredPaths(t *testing.T) {
 	config := NewHashingConfig()
 	modelPath := "/test/model"
-	newPaths := []string{"relative/path", "/absolute/path"}
+	newPaths := []string{"relative/path", "/test/model/subdir/file"}
 
 	config.AddIgnoredPaths(modelPath, newPaths)
 
@@ -205,29 +245,28 @@ func TestAddIgnoredPaths(t *testing.T) {
 		t.Errorf("Expected 2 ignoredPaths, got %d", len(config.ignoredPaths))
 	}
 
-	// Relative path should be converted to absolute
-	expectedRelative := filepath.Join(modelPath, "relative/path")
+	// Relative path should stay relative with forward slashes
 	found := false
 	for _, p := range config.ignoredPaths {
-		if p == expectedRelative {
+		if p == "relative/path" {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("Expected relative path to be converted to '%s'", expectedRelative)
+		t.Errorf("Expected relative path 'relative/path', got %v", config.ignoredPaths)
 	}
 
-	// Absolute path should remain absolute
+	// Absolute path should be converted to relative POSIX path
 	found = false
 	for _, p := range config.ignoredPaths {
-		if p == "/absolute/path" {
+		if p == "subdir/file" {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Error("Expected absolute path to remain unchanged")
+		t.Errorf("Expected absolute path converted to 'subdir/file', got %v", config.ignoredPaths)
 	}
 }
 
@@ -577,5 +616,524 @@ func TestHash_WithSpecificFilesWithoutIgnoreGitPaths(t *testing.T) {
 	// Verify that both files are in the manifest
 	if len(resourceDescriptors) != 2 {
 		t.Errorf("Expected 2 files in manifest (file1.txt, .gitignore), got %d", len(resourceDescriptors))
+	}
+}
+
+func TestWalkDirectory_SymlinkRejectedWhenNotAllowed(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "real.txt")
+	if err := os.WriteFile(target, []byte("data"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "link.txt")
+	if err := os.Symlink(target, link); err != nil {
+		t.Skip("symlinks not supported on this platform")
+	}
+
+	hc := NewHashingConfig()
+	hc.SetAllowSymlinks(false)
+	_, err := hc.Hash(dir, nil)
+	if err == nil {
+		t.Fatal("expected error when symlink encountered with allow_symlinks=false")
+	}
+	if !errors.Is(err, ErrSymlinkNotAllowed) {
+		t.Fatalf("expected ErrSymlinkNotAllowed, got: %v", err)
+	}
+}
+
+func TestWalkDirectory_SymlinkAllowedIncludesBothEntries(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "real.txt")
+	if err := os.WriteFile(target, []byte("data"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "link.txt")
+	if err := os.Symlink(target, link); err != nil {
+		t.Skip("symlinks not supported on this platform")
+	}
+
+	hc := NewHashingConfig()
+	hc.SetAllowSymlinks(true)
+	hc.UseFileSerialization("sha256", true, nil)
+	m, err := hc.Hash(dir, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	descs := m.ResourceDescriptors()
+	if len(descs) != 2 {
+		t.Fatalf("expected 2 descriptors (real.txt + link.txt), got %d", len(descs))
+	}
+	ids := map[string]bool{}
+	for _, d := range descs {
+		ids[d.Identifier] = true
+	}
+	if !ids["real.txt"] || !ids["link.txt"] {
+		t.Errorf("expected real.txt and link.txt, got %v", ids)
+	}
+}
+
+func TestWalkDirectory_RelativeSymlinkRejected(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("a"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("a.txt", filepath.Join(dir, "b.txt")); err != nil {
+		t.Skip("symlinks not supported on this platform")
+	}
+
+	hc := NewHashingConfig()
+	hc.SetAllowSymlinks(false)
+	_, err := hc.Hash(dir, nil)
+	if !errors.Is(err, ErrSymlinkNotAllowed) {
+		t.Fatalf("expected ErrSymlinkNotAllowed for relative symlink, got: %v", err)
+	}
+}
+
+func TestWalkDirectory_FIFOSkipped(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("FIFOs not supported on Windows")
+	}
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "ok.txt"), []byte("ok"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	fifo := filepath.Join(dir, "pipe.fifo")
+	if err := syscall.Mkfifo(fifo, 0600); err != nil {
+		t.Skipf("mkfifo not supported: %v", err)
+	}
+
+	hc := NewHashingConfig()
+	hc.UseFileSerialization("sha256", false, nil)
+	m, err := hc.Hash(dir, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	descs := m.ResourceDescriptors()
+	if len(descs) != 1 {
+		t.Fatalf("expected 1 descriptor (ok.txt only), got %d", len(descs))
+	}
+	if descs[0].Identifier != "ok.txt" {
+		t.Errorf("expected ok.txt, got %s", descs[0].Identifier)
+	}
+}
+
+func TestWalkDirectory_OnlySymlinks_RejectsSymlink(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "hidden.txt")
+	if err := os.WriteFile(target, []byte("h"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, filepath.Join(dir, "only-link.txt")); err != nil {
+		t.Skip("symlinks not supported on this platform")
+	}
+	if err := os.Remove(target); err != nil {
+		t.Fatal(err)
+	}
+
+	hc := NewHashingConfig()
+	hc.SetAllowSymlinks(false)
+	_, err := hc.Hash(dir, nil)
+	if !errors.Is(err, ErrSymlinkNotAllowed) {
+		t.Fatalf("expected ErrSymlinkNotAllowed, got: %v", err)
+	}
+}
+
+func TestWalkDirectory_SymlinkOutsideRootWarns(t *testing.T) {
+	modelDir := t.TempDir()
+	outsideDir := t.TempDir()
+
+	if err := os.WriteFile(filepath.Join(modelDir, "real.txt"), []byte("data"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	outsideFile := filepath.Join(outsideDir, "external.txt")
+	if err := os.WriteFile(outsideFile, []byte("external"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outsideFile, filepath.Join(modelDir, "link.txt")); err != nil {
+		t.Skip("symlinks not supported on this platform")
+	}
+
+	logger := &capturingLogger{}
+	hc := NewHashingConfig()
+	hc.SetAllowSymlinks(true)
+	hc.SetLogger(logger)
+	hc.UseFileSerialization("sha256", true, nil)
+
+	m, err := hc.Hash(modelDir, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if m == nil {
+		t.Fatal("expected non-nil manifest")
+	}
+
+	warnings := logger.Warnings()
+	found := false
+	for _, w := range warnings {
+		if strings.Contains(w, "outside model root") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected warning about symlink target outside model root, got: %v", warnings)
+	}
+}
+
+func TestWalkDirectory_SymlinkCycleWarns(t *testing.T) {
+	modelDir := t.TempDir()
+
+	if err := os.WriteFile(filepath.Join(modelDir, "real.txt"), []byte("data"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("self", filepath.Join(modelDir, "self")); err != nil {
+		t.Skip("symlinks not supported on this platform")
+	}
+
+	logger := &capturingLogger{}
+	hc := NewHashingConfig()
+	hc.SetAllowSymlinks(true)
+	hc.SetLogger(logger)
+	hc.UseFileSerialization("sha256", true, nil)
+
+	_, err := hc.Hash(modelDir, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	warnings := logger.Warnings()
+	found := false
+	for _, w := range warnings {
+		if strings.Contains(w, "cycle") || strings.Contains(w, "broken link") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected warning about symlink cycle, got: %v", warnings)
+	}
+}
+
+func TestWalkDirectory_SymlinkInsideRootNoWarning(t *testing.T) {
+	modelDir := t.TempDir()
+
+	target := filepath.Join(modelDir, "real.txt")
+	if err := os.WriteFile(target, []byte("data"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, filepath.Join(modelDir, "link.txt")); err != nil {
+		t.Skip("symlinks not supported on this platform")
+	}
+
+	logger := &capturingLogger{}
+	hc := NewHashingConfig()
+	hc.SetAllowSymlinks(true)
+	hc.SetLogger(logger)
+	hc.UseFileSerialization("sha256", true, nil)
+
+	_, err := hc.Hash(modelDir, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, w := range logger.Warnings() {
+		if strings.Contains(w, "outside model root") {
+			t.Errorf("unexpected outside-root warning for internal symlink: %s", w)
+		}
+	}
+}
+
+func TestHashFiles_InvalidUTF8PathRejected(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not allow invalid UTF-8 in filenames")
+	}
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "valid.txt"), []byte("ok"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a file with invalid UTF-8 bytes in the name (0xff is never valid in UTF-8)
+	invalidName := "bad\xffname.txt"
+	if err := os.WriteFile(filepath.Join(dir, invalidName), []byte("data"), 0644); err != nil {
+		t.Skipf("OS rejected invalid UTF-8 filename: %v", err)
+	}
+
+	hc := NewHashingConfig()
+	hc.UseFileSerialization("sha256", false, nil)
+
+	_, err := hc.Hash(dir, nil)
+	if err == nil {
+		t.Fatal("expected error for invalid UTF-8 path")
+	}
+	if !errors.Is(err, ErrInvalidUTF8Path) {
+		t.Fatalf("expected ErrInvalidUTF8Path, got: %v", err)
+	}
+}
+
+func TestHashShards_InvalidUTF8PathRejected(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not allow invalid UTF-8 in filenames")
+	}
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "valid.txt"), []byte("ok"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	invalidName := "bad\xffname.txt"
+	if err := os.WriteFile(filepath.Join(dir, invalidName), []byte("data"), 0644); err != nil {
+		t.Skipf("OS rejected invalid UTF-8 filename: %v", err)
+	}
+
+	hc := NewHashingConfig()
+	hc.UseShardSerialization("sha256", 16, false, nil)
+
+	_, err := hc.Hash(dir, nil)
+	if err == nil {
+		t.Fatal("expected error for invalid UTF-8 path")
+	}
+	if !errors.Is(err, ErrInvalidUTF8Path) {
+		t.Fatalf("expected ErrInvalidUTF8Path, got: %v", err)
+	}
+}
+
+func TestHashFiles_PathTraversalRejected(t *testing.T) {
+	modelDir := t.TempDir()
+	outsideDir := t.TempDir()
+
+	if err := os.WriteFile(filepath.Join(modelDir, "ok.txt"), []byte("ok"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	escapee := filepath.Join(outsideDir, "secret.txt")
+	if err := os.WriteFile(escapee, []byte("secret"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	hc := NewHashingConfig()
+	hc.UseFileSerialization("sha256", false, nil)
+
+	_, err := hc.Hash(modelDir, []string{escapee})
+	if err == nil {
+		t.Fatal("expected error for path traversal")
+	}
+	if !errors.Is(err, utils.ErrPathTraversal) {
+		t.Fatalf("expected utils.ErrPathTraversal, got: %v", err)
+	}
+}
+
+func TestHashShards_PathTraversalRejected(t *testing.T) {
+	modelDir := t.TempDir()
+	outsideDir := t.TempDir()
+
+	if err := os.WriteFile(filepath.Join(modelDir, "ok.txt"), []byte("ok"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	escapee := filepath.Join(outsideDir, "secret.txt")
+	if err := os.WriteFile(escapee, []byte("secret"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	hc := NewHashingConfig()
+	hc.UseShardSerialization("sha256", 16, false, nil)
+
+	_, err := hc.Hash(modelDir, []string{escapee})
+	if err == nil {
+		t.Fatal("expected error for path traversal")
+	}
+	if !errors.Is(err, utils.ErrPathTraversal) {
+		t.Fatalf("expected utils.ErrPathTraversal, got: %v", err)
+	}
+}
+
+func TestHashFiles_NonRegularFileSkipped(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("FIFOs are not supported on Windows")
+	}
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "regular.txt"), []byte("data"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	fifoPath := filepath.Join(dir, "myfifo")
+	if err := syscall.Mkfifo(fifoPath, 0644); err != nil {
+		t.Fatalf("failed to create FIFO: %v", err)
+	}
+
+	hc := NewHashingConfig()
+	hc.UseFileSerialization("sha256", false, nil)
+
+	m, err := hc.Hash(dir, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, item := range m.ResourceDescriptors() {
+		if item.Identifier == "myfifo" {
+			t.Error("FIFO should not appear in manifest")
+		}
+	}
+}
+
+func TestHashShards_NonRegularFileSkipped(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("FIFOs are not supported on Windows")
+	}
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "regular.txt"), []byte("data"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	fifoPath := filepath.Join(dir, "myfifo")
+	if err := syscall.Mkfifo(fifoPath, 0644); err != nil {
+		t.Fatalf("failed to create FIFO: %v", err)
+	}
+
+	hc := NewHashingConfig()
+	hc.UseShardSerialization("sha256", 16, false, nil)
+
+	m, err := hc.Hash(dir, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, item := range m.ResourceDescriptors() {
+		if item.Identifier == "myfifo" {
+			t.Error("FIFO should not appear in manifest")
+		}
+	}
+}
+
+func TestHashFiles_NonRegularFileSkippedViaFilesToHash(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("FIFOs are not supported on Windows")
+	}
+
+	dir := t.TempDir()
+	regularPath := filepath.Join(dir, "regular.txt")
+	if err := os.WriteFile(regularPath, []byte("data"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	fifoPath := filepath.Join(dir, "myfifo")
+	if err := syscall.Mkfifo(fifoPath, 0644); err != nil {
+		t.Fatalf("failed to create FIFO: %v", err)
+	}
+
+	hc := NewHashingConfig()
+	hc.UseFileSerialization("sha256", false, nil)
+
+	m, err := hc.Hash(dir, []string{regularPath, fifoPath})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, item := range m.ResourceDescriptors() {
+		if item.Identifier == "myfifo" {
+			t.Error("FIFO passed via filesToHash should not appear in manifest")
+		}
+	}
+	if len(m.ResourceDescriptors()) != 1 {
+		t.Errorf("expected 1 manifest item, got %d", len(m.ResourceDescriptors()))
+	}
+}
+
+func TestHashShards_EmptyFileOmitted(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "data.bin"), []byte("content"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "empty.bin"), []byte{}, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	hc := NewHashingConfig()
+	hc.UseShardSerialization("sha256", 16, false, nil)
+
+	m, err := hc.Hash(dir, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, d := range m.ResourceDescriptors() {
+		if strings.Contains(d.Identifier, "empty") {
+			t.Errorf("zero-byte file should be omitted from shard manifest, got: %s", d.Identifier)
+		}
+	}
+	if len(m.ResourceDescriptors()) != 1 {
+		t.Fatalf("expected 1 descriptor (data.bin only), got %d", len(m.ResourceDescriptors()))
+	}
+}
+
+func TestHashFiles_ValidUTF8PathAccepted(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "日本語.txt"), []byte("unicode"), 0644); err != nil {
+		t.Skipf("OS rejected unicode filename: %v", err)
+	}
+
+	hc := NewHashingConfig()
+	hc.UseFileSerialization("sha256", false, nil)
+
+	m, err := hc.Hash(dir, nil)
+	if err != nil {
+		t.Fatalf("valid UTF-8 path should be accepted: %v", err)
+	}
+	if len(m.ResourceDescriptors()) != 1 {
+		t.Fatalf("expected 1 descriptor, got %d", len(m.ResourceDescriptors()))
+	}
+}
+
+func TestHashFiles_SingleFileUsesBasename(t *testing.T) {
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "model.bin")
+	if err := os.WriteFile(filePath, []byte("weights"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	hc := NewHashingConfig()
+	hc.UseFileSerialization("sha256", false, nil)
+
+	m, err := hc.Hash(filePath, nil)
+	if err != nil {
+		t.Fatalf("Hash single file failed: %v", err)
+	}
+
+	descs := m.ResourceDescriptors()
+	if len(descs) != 1 {
+		t.Fatalf("expected 1 descriptor, got %d", len(descs))
+	}
+	if descs[0].Identifier != "model.bin" {
+		t.Errorf("expected resource name 'model.bin', got %q", descs[0].Identifier)
+	}
+}
+
+func TestHashShards_SingleFileUsesBasename(t *testing.T) {
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "model.bin")
+	if err := os.WriteFile(filePath, []byte("weights-data"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	hc := NewHashingConfig()
+	hc.UseShardSerialization("sha256", 4, false, nil)
+
+	m, err := hc.Hash(filePath, nil)
+	if err != nil {
+		t.Fatalf("Hash single file with shards failed: %v", err)
+	}
+
+	descs := m.ResourceDescriptors()
+	if len(descs) == 0 {
+		t.Fatal("expected at least 1 descriptor")
+	}
+	for _, d := range descs {
+		if strings.HasPrefix(d.Identifier, ".") {
+			t.Errorf("resource name should not start with '.', got %q", d.Identifier)
+		}
+		if !strings.HasPrefix(d.Identifier, "model.bin") {
+			t.Errorf("expected resource name starting with 'model.bin', got %q", d.Identifier)
+		}
 	}
 }

@@ -3,7 +3,7 @@
 # Hardening tests for model-signing
 #
 # This script tests:
-# 1. Key type variations (RSA, ECDSA P-256, P-384, Ed25519)
+# 1. Key type variations (RSA, ECDSA P-256, P-384, P-521, Ed25519)
 # 2. Signature tampering detection
 # 3. Model tampering detection
 # 4. Edge case models
@@ -15,6 +15,8 @@ set -e
 DIR=${PWD}/$(dirname "$0")
 TMPDIR=$(mktemp -d) || exit 1
 KEYSDIR="${TMPDIR}/keys"
+
+source "${DIR}/functions"
 
 cleanup() {
 	rm -rf "${TMPDIR}"
@@ -153,19 +155,28 @@ if ! out=$(${DIR}/model-signing verify key \
 fi
 echo "  ECDSA P-384: PASSED"
 
-# --- ECDSA P-521 (unsupported by sigstore protobuf specs — should be rejected) ---
-echo "[Key Types] Testing ECDSA P-521 rejection (unsupported curve)..."
+# --- ECDSA P-521 ---
+echo "[Key Types] Testing ECDSA P-521..."
 generate_ecdsa_key "ecdsa-p521" "secp521r1"
 SIGFILE="${TMPDIR}/ecdsa-p521.sig"
 
-if ${DIR}/model-signing sign key \
+if ! ${DIR}/model-signing sign key \
 	--signature "${SIGFILE}" \
 	--private-key "${KEYSDIR}/ecdsa-p521.pem" \
 	"${MODELDIR}" >/dev/null 2>&1; then
-	echo "  Error: Sign with ECDSA P-521 should have been rejected"
+	echo "  Error: Sign with ECDSA P-521 failed"
 	exit 1
 fi
-echo "  ECDSA P-521 rejected: PASSED"
+
+if ! out=$(${DIR}/model-signing verify key \
+	--signature "${SIGFILE}" \
+	--public-key "${KEYSDIR}/ecdsa-p521-pub.pem" \
+	"${MODELDIR}" 2>&1); then
+	echo "  Error: Verify with ECDSA P-521 failed"
+	echo "  ${out}"
+	exit 1
+fi
+echo "  ECDSA P-521: PASSED"
 
 # --- Ed25519 ---
 echo "[Key Types] Testing Ed25519..."
@@ -798,7 +809,7 @@ fi
 if ! ${DIR}/model-signing verify key \
 	--signature "${SIGFILE}" \
 	--public-key "${KEYSDIR}/flags-key-pub.pem" \
-	--ignore-paths "${MODELDIR}/should-ignore.txt" \
+	--ignore-paths "should-ignore.txt" \
 	"${MODELDIR}" >/dev/null 2>&1; then
 	echo "  Error: Verification should pass with --ignore-paths"
 	exit 1
@@ -806,6 +817,34 @@ fi
 echo "  --ignore-paths: PASSED"
 
 rm "${MODELDIR}/should-ignore.txt"
+
+# --- Test ignore_paths from signed bundle (spec §8.4, issue #161) ---
+echo "[Flags] Testing ignore_paths honored from signed bundle..."
+SIGFILE="${TMPDIR}/ignore-paths-bundle.sig"
+
+# Add a file and sign WITH --ignore-paths so it's recorded in the bundle
+echo "bundle-ignored" > "${MODELDIR}/bundle-ignored.txt"
+if ! ${DIR}/model-signing sign key \
+	--signature "${SIGFILE}" \
+	--private-key "${KEYSDIR}/flags-key.pem" \
+	--ignore-paths "bundle-ignored.txt" \
+	"${MODELDIR}" >/dev/null 2>&1; then
+	echo "  Error: Sign with --ignore-paths failed"
+	exit 1
+fi
+
+# Verify WITHOUT --ignore-paths should succeed because the bundle
+# records ignore_paths=["bundle-ignored.txt"] (spec §8.4)
+if ! ${DIR}/model-signing verify key \
+	--signature "${SIGFILE}" \
+	--public-key "${KEYSDIR}/flags-key-pub.pem" \
+	"${MODELDIR}" >/dev/null 2>&1; then
+	echo "  Error: Verification should pass using bundle's ignore_paths"
+	exit 1
+fi
+echo "  ignore_paths from bundle: PASSED"
+
+rm "${MODELDIR}/bundle-ignored.txt"
 
 # --- Test --ignore-unsigned-files ---
 echo "[Flags] Testing --ignore-unsigned-files..."
@@ -857,12 +896,12 @@ SIGFILE_NO_SYMLINK="${TMPDIR}/symlinks-no.sig"
 echo "target-content" > "${MODELDIR}/target.txt"
 ln -s target.txt "${MODELDIR}/link.txt"
 
-# Sign without --allow-symlinks succeeds but skips symlinks
-if ! ${DIR}/model-signing sign key \
+# Sign without --allow-symlinks MUST fail (OMS spec §6.1.1)
+if ${DIR}/model-signing sign key \
 	--signature "${SIGFILE_NO_SYMLINK}" \
 	--private-key "${KEYSDIR}/flags-key.pem" \
 	"${MODELDIR}" >/dev/null 2>&1; then
-	echo "  Error: Sign should succeed (symlinks are skipped by default)"
+	echo "  Error: Sign should fail when symlinks are present and allow_symlinks is false"
 	exit 1
 fi
 
@@ -876,32 +915,35 @@ if ! ${DIR}/model-signing sign key \
 	exit 1
 fi
 
-# Verify signature that includes symlinks requires --allow-symlinks
-# Without the flag, verification fails because symlink is in signature but skipped
+# Verify signature that includes symlinks: the verifier uses the bundle's
+# allow_symlinks=true (spec §6.1.1, §8.4), so no CLI flag is needed.
+if ! ${DIR}/model-signing verify key \
+	--signature "${SIGFILE}" \
+	--public-key "${KEYSDIR}/flags-key-pub.pem" \
+	"${MODELDIR}" >/dev/null 2>&1; then
+	echo "  Error: Verify should succeed using bundle's allow_symlinks=true"
+	exit 1
+fi
+
+# Remove symlinks, then sign and verify without --allow-symlinks
+rm "${MODELDIR}/link.txt"
+
+if ! ${DIR}/model-signing sign key \
+	--signature "${SIGFILE_NO_SYMLINK}" \
+	--private-key "${KEYSDIR}/flags-key.pem" \
+	"${MODELDIR}" >/dev/null 2>&1; then
+	echo "  Error: Sign should succeed when no symlinks are present"
+	exit 1
+fi
+
+# Re-create symlink to verify it causes an error on verify too
+ln -s target.txt "${MODELDIR}/link.txt"
+
 if ${DIR}/model-signing verify key \
-	--signature "${SIGFILE}" \
-	--public-key "${KEYSDIR}/flags-key-pub.pem" \
-	"${MODELDIR}" >/dev/null 2>&1; then
-	echo "  Error: Verify should fail when signature includes symlink but flag not passed"
-	exit 1
-fi
-
-# Verify with --allow-symlinks should succeed
-if ! ${DIR}/model-signing verify key \
-	--signature "${SIGFILE}" \
-	--public-key "${KEYSDIR}/flags-key-pub.pem" \
-	--allow-symlinks \
-	"${MODELDIR}" >/dev/null 2>&1; then
-	echo "  Error: Verify should succeed with --allow-symlinks"
-	exit 1
-fi
-
-# Verify signature without symlinks also works (symlinks skipped during verify)
-if ! ${DIR}/model-signing verify key \
 	--signature "${SIGFILE_NO_SYMLINK}" \
 	--public-key "${KEYSDIR}/flags-key-pub.pem" \
 	"${MODELDIR}" >/dev/null 2>&1; then
-	echo "  Error: Verify should succeed when symlinks are skipped"
+	echo "  Error: Verify should fail when symlink present and allow_symlinks is false"
 	exit 1
 fi
 echo "  --allow-symlinks: PASSED"
@@ -916,7 +958,7 @@ SIGFILE="${TMPDIR}/combined1.sig"
 if ! ${DIR}/model-signing sign key \
 	--signature "${SIGFILE}" \
 	--private-key "${KEYSDIR}/flags-key.pem" \
-	--ignore-paths "${MODELDIR}/ignore-me.txt" \
+	--ignore-paths "ignore-me.txt" \
 	"${MODELDIR}" >/dev/null 2>&1; then
 	echo "  Error: Sign failed"
 	exit 1
@@ -930,7 +972,7 @@ echo "modified-ignore" > "${MODELDIR}/ignore-me.txt"
 if ! ${DIR}/model-signing verify key \
 	--signature "${SIGFILE}" \
 	--public-key "${KEYSDIR}/flags-key-pub.pem" \
-	--ignore-paths "${MODELDIR}/ignore-me.txt" \
+	--ignore-paths "ignore-me.txt" \
 	--ignore-unsigned-files \
 	"${MODELDIR}" >/dev/null 2>&1; then
 	echo "  Error: Verification should pass with combined flags"
@@ -987,7 +1029,7 @@ ln -s target.txt "${MODELDIR}/link.txt"
 if ! ${DIR}/model-signing sign key \
 	--signature "${SIGFILE}" \
 	--private-key "${KEYSDIR}/flags-key.pem" \
-	--ignore-paths "${MODELDIR}/ignore-me.txt" \
+	--ignore-paths "ignore-me.txt" \
 	--allow-symlinks \
 	"${MODELDIR}" >/dev/null 2>&1; then
 	echo "  Error: Sign failed"
@@ -1004,7 +1046,7 @@ ln -s new-target.txt "${MODELDIR}/new-link.txt"
 if ! ${DIR}/model-signing verify key \
 	--signature "${SIGFILE}" \
 	--public-key "${KEYSDIR}/flags-key-pub.pem" \
-	--ignore-paths "${MODELDIR}/ignore-me.txt" \
+	--ignore-paths "ignore-me.txt" \
 	--allow-symlinks \
 	--ignore-unsigned-files \
 	"${MODELDIR}" >/dev/null 2>&1; then
@@ -1028,7 +1070,7 @@ if ! ${DIR}/model-signing sign certificate \
 	--signature "${SIGFILE}" \
 	--private-key "${CERTSDIR}/self-signed-key.pem" \
 	--signing-certificate "${CERTSDIR}/self-signed-cert.pem" \
-	--ignore-paths "${MODELDIR}/ignore-me.txt" \
+	--ignore-paths "ignore-me.txt" \
 	--allow-symlinks \
 	"${MODELDIR}" >/dev/null 2>&1; then
 	echo "  Error: Sign certificate with flags failed"
@@ -1042,7 +1084,7 @@ echo "new-unsigned" > "${MODELDIR}/new-unsigned.txt"
 if ! ${DIR}/model-signing verify certificate \
 	--signature "${SIGFILE}" \
 	--certificate-chain "${CERTSDIR}/self-signed-cert.pem" \
-	--ignore-paths "${MODELDIR}/ignore-me.txt" \
+	--ignore-paths "ignore-me.txt" \
 	--allow-symlinks \
 	--ignore-unsigned-files \
 	"${MODELDIR}" >/dev/null 2>&1; then
@@ -1050,6 +1092,95 @@ if ! ${DIR}/model-signing verify certificate \
 	exit 1
 fi
 echo "  Certificate method with flags: PASSED"
+
+echo
+
+echo "=========================================="
+echo "PART 7: TSA Flag Validation"
+echo "=========================================="
+echo
+
+MODELDIR="${TMPDIR}/model-tsa"
+create_test_model "${MODELDIR}"
+
+generate_ecdsa_key "tsa-key" "prime256v1"
+
+# --- Verify --tsa-url flag is recognized by sign key ---
+echo "[TSA] Testing --tsa-url flag is recognized by 'sign key'..."
+SIGFILE="${TMPDIR}/tsa-flag-key.sig"
+
+# Use an unreachable URL; the command should fail at TSA contact, not at flag parsing
+tsa_output=$(${DIR}/model-signing sign key \
+	--signature "${SIGFILE}" \
+	--private-key "${KEYSDIR}/tsa-key.pem" \
+	--tsa-url "https://127.0.0.1:1/nonexistent-tsa" \
+	"${MODELDIR}" 2>&1) || true
+
+if echo "${tsa_output}" | grep -qi "unknown flag"; then
+	echo "  Error: --tsa-url flag not recognized by 'sign key'"
+	exit 1
+fi
+echo "  --tsa-url flag recognized by 'sign key': PASSED"
+
+# --- Verify --tsa-url flag is recognized by sign certificate ---
+echo "[TSA] Testing --tsa-url flag is recognized by 'sign certificate'..."
+SIGFILE="${TMPDIR}/tsa-flag-cert.sig"
+
+# Generate a self-signed cert for this test
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 \
+	-keyout "${KEYSDIR}/tsa-cert-key.pem" \
+	-out "${KEYSDIR}/tsa-cert.pem" \
+	-days 1 -nodes \
+	-subj "/CN=TSA Test" \
+	-addext "keyUsage=digitalSignature" \
+	-addext "extendedKeyUsage=codeSigning" 2>/dev/null
+
+tsa_output=$(${DIR}/model-signing sign certificate \
+	--signature "${SIGFILE}" \
+	--private-key "${KEYSDIR}/tsa-cert-key.pem" \
+	--signing-certificate "${KEYSDIR}/tsa-cert.pem" \
+	--tsa-url "https://127.0.0.1:1/nonexistent-tsa" \
+	"${MODELDIR}" 2>&1) || true
+
+if echo "${tsa_output}" | grep -qi "unknown flag"; then
+	echo "  Error: --tsa-url flag not recognized by 'sign certificate'"
+	exit 1
+fi
+echo "  --tsa-url flag recognized by 'sign certificate': PASSED"
+
+# --- Verify signing without --tsa-url produces no TSA timestamps ---
+echo "[TSA] Testing signing without --tsa-url produces no TSA timestamps..."
+SIGFILE="${TMPDIR}/no-tsa.sig"
+
+if ! ${DIR}/model-signing sign key \
+	--signature "${SIGFILE}" \
+	--private-key "${KEYSDIR}/tsa-key.pem" \
+	"${MODELDIR}" >/dev/null 2>&1; then
+	echo "  Error: Sign without --tsa-url failed"
+	exit 1
+fi
+
+if has_tsa_timestamp "${SIGFILE}"; then
+	echo "  Error: Bundle should not contain TSA timestamps when --tsa-url is not used"
+	exit 1
+fi
+
+tsa_count=$(get_tsa_timestamp_count "${SIGFILE}")
+if [ "${tsa_count}" != "0" ]; then
+	echo "  Error: Expected 0 TSA timestamps, got ${tsa_count}"
+	exit 1
+fi
+echo "  No TSA timestamps without --tsa-url: PASSED"
+
+# --- Verify the bundle is still valid without TSA ---
+if ! ${DIR}/model-signing verify key \
+	--signature "${SIGFILE}" \
+	--public-key "${KEYSDIR}/tsa-key-pub.pem" \
+	"${MODELDIR}" >/dev/null 2>&1; then
+	echo "  Error: Verify without TSA failed"
+	exit 1
+fi
+echo "  Verify without TSA: PASSED"
 
 echo
 

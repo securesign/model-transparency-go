@@ -15,6 +15,7 @@
 package manifest
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 
@@ -181,5 +182,63 @@ func TestSerializationParametersDefensiveCopy(t *testing.T) {
 		if paths2[0] != "ignore/me" {
 			t.Fatalf("underlying ignore_paths mutated via returned map, got %v", paths2)
 		}
+	}
+}
+
+func TestShardSerializationFromArgsRejectsZeroShardSize(t *testing.T) {
+	args := map[string]any{
+		"method":         shardMethod,
+		"hash_type":      "sha256",
+		"shard_size":     0,
+		"allow_symlinks": false,
+	}
+
+	_, err := SerializationTypeFromArgs(args)
+	if err == nil {
+		t.Fatal("expected error for shard_size=0, got nil")
+	}
+}
+
+func TestShardSerializationFromArgsRejectsNegativeShardSize(t *testing.T) {
+	args := map[string]any{
+		"method":         shardMethod,
+		"hash_type":      "sha256",
+		"shard_size":     int64(-1),
+		"allow_symlinks": false,
+	}
+
+	_, err := SerializationTypeFromArgs(args)
+	if err == nil {
+		t.Fatal("expected error for negative shard_size, got nil")
+	}
+}
+
+func FuzzSerializationTypeFromArgs(f *testing.F) {
+	f.Add([]byte(`{"method":"files","hash_type":"sha256","allow_symlinks":false,"ignore_paths":[]}`))
+	f.Add([]byte(`{"method":"shards","hash_type":"sha256","shard_size":1024,"allow_symlinks":false}`))
+	f.Add([]byte(`{"method":"unknown"}`))
+	f.Add([]byte(`{}`))
+	f.Add([]byte(``))
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		var args map[string]any
+		if json.Unmarshal(data, &args) != nil {
+			return
+		}
+		_, _ = SerializationTypeFromArgs(args)
+	})
+}
+
+func TestFileSerializationRejectsSpuriousShardSize(t *testing.T) {
+	args := map[string]any{
+		"method":         fileMethod,
+		"hash_type":      "sha256",
+		"allow_symlinks": false,
+		"shard_size":     1024,
+	}
+
+	_, err := SerializationTypeFromArgs(args)
+	if err == nil {
+		t.Fatal("expected error for shard_size present with method 'files', got nil")
 	}
 }

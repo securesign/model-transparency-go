@@ -27,7 +27,7 @@
 //   - Context: Manages PKCS#11 module loading and key discovery via crypto11
 //   - URI: Parser for RFC 7512 PKCS#11 URIs
 //
-// Supported key types: ECDSA (P-256, P-384), RSA (2048, 3072, 4096 bits)
+// Supported key types: ECDSA (P-256, P-384, P-521), RSA (2048, 3072, 4096 bits)
 package pkcs11
 
 import (
@@ -53,11 +53,14 @@ type Pkcs11SignerOptions struct {
 	IgnorePaths            []string       // IgnorePaths specifies paths to exclude from hashing.
 	IgnoreGitPaths         bool           // IgnoreGitPaths indicates whether to exclude git-ignored files.
 	AllowSymlinks          bool           // AllowSymlinks indicates whether to follow symbolic links.
+	HashAlgorithm          string         // HashAlgorithm is the hash algorithm to use (default: "sha256").
+	ShardSize              int64          // ShardSize enables shard-based serialization if > 0.
 	URI                    string         // URI is the PKCS#11 URI identifying the key. [required]
 	ModulePaths            []string       // ModulePaths are additional directories to search for PKCS#11 modules.
 	SigningCertificatePath string         // SigningCertificatePath is the path to the signing certificate (optional).
 	CertificateChain       []string       // CertificateChain are paths to certificate chain files (optional).
 	Logger                 logging.Logger // Logger is used for debug and info output.
+	TSAUrl                 string         // TSAUrl is the optional URL of an RFC 3161 Timestamp Authority.
 }
 
 // Pkcs11Signer implements ModelSigner using PKCS#11-based signing.
@@ -128,6 +131,8 @@ func (s *Pkcs11Signer) Sign(ctx context.Context) (signing.Result, error) {
 		IgnorePaths:    s.opts.IgnorePaths,
 		IgnoreGitPaths: s.opts.IgnoreGitPaths,
 		AllowSymlinks:  s.opts.AllowSymlinks,
+		HashAlgorithm:  s.opts.HashAlgorithm,
+		ShardSize:      s.opts.ShardSize,
 		Logger:         s.logger,
 	}, s.logger)
 	if err != nil {
@@ -153,6 +158,9 @@ func (s *Pkcs11Signer) Sign(ctx context.Context) (signing.Result, error) {
 		PayloadType: utils.InTotoJSONPayloadType,
 	}
 
+	bundleOpts := sigstoresign.BundleOptions{Context: ctx}
+	signing.ApplyTSA(&bundleOpts, s.opts.TSAUrl, s.logger)
+
 	var bundle *protobundle.Bundle
 	if s.opts.SigningCertificatePath != "" {
 		certProvider, err := cert.NewModelCertificateProvider(s.opts.SigningCertificatePath, keypair)
@@ -163,10 +171,8 @@ func (s *Pkcs11Signer) Sign(ctx context.Context) (signing.Result, error) {
 			}, fmt.Errorf("failed to load certificate: %w", err)
 		}
 
-		bundle, err = sigstoresign.Bundle(content, keypair, sigstoresign.BundleOptions{
-			CertificateProvider: certProvider,
-			Context:             ctx,
-		})
+		bundleOpts.CertificateProvider = certProvider
+		bundle, err = sigstoresign.Bundle(content, keypair, bundleOpts)
 		if err != nil {
 			return signing.Result{
 				Verified: false,
@@ -174,9 +180,7 @@ func (s *Pkcs11Signer) Sign(ctx context.Context) (signing.Result, error) {
 			}, fmt.Errorf("failed to create signature bundle: %w", err)
 		}
 	} else {
-		bundle, err = sigstoresign.Bundle(content, keypair, sigstoresign.BundleOptions{
-			Context: ctx,
-		})
+		bundle, err = sigstoresign.Bundle(content, keypair, bundleOpts)
 		if err != nil {
 			return signing.Result{
 				Verified: false,

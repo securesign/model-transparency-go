@@ -53,6 +53,14 @@ func MarshalPayload(m *manifest.Manifest) ([]byte, error) {
 		resources = append(resources, resource)
 	}
 
+	// Assert lexicographic sort order of resources (spec §5.2.1).
+	for i := 1; i < len(resources); i++ {
+		if resources[i]["name"].(string) <= resources[i-1]["name"].(string) {
+			return nil, fmt.Errorf("resources not sorted lexicographically: %q appears after %q (spec §5.2.1)",
+				resources[i]["name"], resources[i-1]["name"])
+		}
+	}
+
 	// Compute root digest (SHA256 over all individual digests in order)
 	rootDigest, err := memory.ComputeRootDigest(digestList)
 	if err != nil {
@@ -104,10 +112,18 @@ func MarshalPayload(m *manifest.Manifest) ([]byte, error) {
 // Validates the root digest against the resource digests. Handles both
 // v1.0 and v0.2 (compat) predicate formats.
 func UnmarshalPayload(data []byte) (*manifest.Manifest, error) {
-	// Parse JSON into a generic map for flexible handling
 	var dssePayload map[string]interface{}
 	if err := json.Unmarshal(data, &dssePayload); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal payload JSON: %w", err)
+	}
+
+	// Validate _type field (spec §8.3)
+	stmtType, ok := dssePayload["_type"].(string)
+	if !ok {
+		return nil, fmt.Errorf("_type field missing or not a string")
+	}
+	if stmtType != utils.InTotoStatementType {
+		return nil, fmt.Errorf("unsupported statement type: expected %s, got %s", utils.InTotoStatementType, stmtType)
 	}
 
 	predicateType, ok := dssePayload["predicateType"].(string)
@@ -151,6 +167,10 @@ func unmarshalPayloadV1(dssePayload map[string]interface{}) (*manifest.Manifest,
 	modelName, ok := subject["name"].(string)
 	if !ok {
 		return nil, fmt.Errorf("subject name missing or not a string")
+	}
+
+	if modelName == "" {
+		return nil, fmt.Errorf("subject name must not be empty")
 	}
 
 	digestMap, ok := subject["digest"].(map[string]interface{})
@@ -201,6 +221,10 @@ func unmarshalPayloadV1(dssePayload map[string]interface{}) (*manifest.Manifest,
 		return nil, fmt.Errorf("resources is not an array")
 	}
 
+	if len(resources) == 0 {
+		return nil, fmt.Errorf("resources array must contain at least one entry (spec §5.2.1)")
+	}
+
 	// Reconstruct manifest items and collect digests
 	items := make([]manifest.ManifestItem, 0, len(resources))
 	digestList := make([]digests.Digest, 0, len(resources))
@@ -240,6 +264,14 @@ func unmarshalPayloadV1(dssePayload map[string]interface{}) (*manifest.Manifest,
 		}
 
 		items = append(items, item)
+	}
+
+	// Verify lexicographic sort order of resources (spec §5.2.1)
+	for i := 1; i < len(items); i++ {
+		if items[i].Name() <= items[i-1].Name() {
+			return nil, fmt.Errorf("resources array not sorted lexicographically: %q appears after %q (spec §5.2.1)",
+				items[i].Name(), items[i-1].Name())
+		}
 	}
 
 	// Verify root digest

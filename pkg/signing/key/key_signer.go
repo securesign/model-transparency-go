@@ -40,9 +40,12 @@ type KeySignerOptions struct {
 	IgnorePaths    []string       // IgnorePaths specifies paths to exclude from hashing.
 	IgnoreGitPaths bool           // IgnoreGitPaths indicates whether to exclude git-ignored files.
 	AllowSymlinks  bool           // AllowSymlinks indicates whether to follow symbolic links.
+	HashAlgorithm  string         // HashAlgorithm is the hash algorithm to use (default: "sha256").
+	ShardSize      int64          // ShardSize enables shard-based serialization if > 0.
 	Logger         logging.Logger // Logger is used for debug and info output.
 	PrivateKeyPath string         // PrivateKeyPath is the path to the private key file.
 	Password       string         // Password is the optional password for the private key.
+	TSAUrl         string         // TSAUrl is the optional URL of an RFC 3161 Timestamp Authority.
 }
 
 // KeySigner implements ModelSigner using local private key-based signing.
@@ -98,6 +101,8 @@ func (s *KeySigner) Sign(ctx context.Context) (signing.Result, error) {
 		IgnorePaths:    s.opts.IgnorePaths,
 		IgnoreGitPaths: s.opts.IgnoreGitPaths,
 		AllowSymlinks:  s.opts.AllowSymlinks,
+		HashAlgorithm:  s.opts.HashAlgorithm,
+		ShardSize:      s.opts.ShardSize,
 		Logger:         s.logger,
 	}, s.logger)
 	if err != nil {
@@ -122,9 +127,10 @@ func (s *KeySigner) Sign(ctx context.Context) (signing.Result, error) {
 		PayloadType: utils.InTotoJSONPayloadType,
 	}
 
-	bundle, err := sigstoresign.Bundle(content, keypair, sigstoresign.BundleOptions{
-		Context: ctx,
-	})
+	bundleOpts := sigstoresign.BundleOptions{Context: ctx}
+	signing.ApplyTSA(&bundleOpts, s.opts.TSAUrl, s.logger)
+
+	bundle, err := sigstoresign.Bundle(content, keypair, bundleOpts)
 	if err != nil {
 		return signing.Result{
 			Verified: false,
