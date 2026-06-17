@@ -17,12 +17,15 @@ package signing
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/sigstore/model-signing/pkg/logging"
 	"github.com/sigstore/model-signing/pkg/manifest"
 	"github.com/sigstore/model-signing/pkg/modelartifact"
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	"github.com/sigstore/sigstore-go/pkg/bundle"
+	sigstoresign "github.com/sigstore/sigstore-go/pkg/sign"
 )
 
 // WriteBundle writes a protobuf bundle to disk in sigstore JSON format.
@@ -50,6 +53,16 @@ func WriteBundle(protoBundle *protobundle.Bundle, path string) error {
 	return nil
 }
 
+// ApplyTSA configures timestamp authority options on the bundle if a TSA URL is provided.
+func ApplyTSA(bundleOpts *sigstoresign.BundleOptions, tsaURL string, logger logging.Logger) {
+	if tsaURL != "" {
+		logger.Debug("  Using RFC 3161 Timestamp Authority: %s", tsaURL)
+		bundleOpts.TimestampAuthorities = []*sigstoresign.TimestampAuthority{
+			sigstoresign.NewTimestampAuthority(&sigstoresign.TimestampAuthorityOptions{URL: tsaURL}),
+		}
+	}
+}
+
 // PreparePayload canonicalizes a model and marshals the manifest into an in-toto
 // payload. This is the common first two steps of all signing flows:
 // 1. Walk the model directory/OCI manifest to produce a deterministic Manifest
@@ -60,13 +73,13 @@ func WriteBundle(protoBundle *protobundle.Bundle, path string) error {
 func PreparePayload(modelPath, signaturePath string, opts modelartifact.Options, logger logging.Logger) (*manifest.Manifest, []byte, error) {
 	// Step 1: Canonicalize the model
 	logger.Debugln("\nStep 1: Canonicalizing model...")
-	ignorePaths := append(append([]string{}, opts.IgnorePaths...), signaturePath)
-	canonOpts := modelartifact.Options{
-		IgnorePaths:    ignorePaths,
-		IgnoreGitPaths: opts.IgnoreGitPaths,
-		AllowSymlinks:  opts.AllowSymlinks,
-		Logger:         logger,
+	ignorePaths := append([]string{}, opts.IgnorePaths...)
+	if relSig, err := filepath.Rel(modelPath, signaturePath); err == nil && !strings.HasPrefix(relSig, "..") {
+		ignorePaths = append(ignorePaths, filepath.ToSlash(relSig))
 	}
+	canonOpts := opts
+	canonOpts.IgnorePaths = ignorePaths
+	canonOpts.Logger = logger
 	m, err := modelartifact.Canonicalize(modelPath, canonOpts)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to canonicalize model: %w", err)

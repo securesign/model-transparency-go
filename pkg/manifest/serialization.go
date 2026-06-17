@@ -109,17 +109,15 @@ func (s *FileSerialization) Method() string {
 // The returned map contains method, hash_type, allow_symlinks, and optionally
 // ignore_paths. Returns a new map with a copy of the ignorePaths slice.
 func (s *FileSerialization) Parameters() map[string]any {
-	params := map[string]any{
+	pathsCopy := make([]string, len(s.ignorePaths))
+	copy(pathsCopy, s.ignorePaths)
+
+	return map[string]any{
 		"method":         s.Method(),
 		"hash_type":      s.hashType,
 		"allow_symlinks": s.allowSymlinks,
+		"ignore_paths":   pathsCopy,
 	}
-	if len(s.ignorePaths) > 0 {
-		pathsCopy := make([]string, len(s.ignorePaths))
-		copy(pathsCopy, s.ignorePaths)
-		params["ignore_paths"] = pathsCopy
-	}
-	return params
 }
 
 // NewItem creates a ManifestItem from a name and digest.
@@ -134,6 +132,10 @@ func (s *FileSerialization) NewItem(name string, digest digests.Digest) (Manifes
 //
 // Returns an error if required fields are missing or have incorrect types.
 func fileSerializationFromArgs(args map[string]any) (*FileSerialization, error) {
+	if _, ok := args["shard_size"]; ok {
+		return nil, fmt.Errorf("shard_size must not be present when method is %q (spec §5.2.2)", fileMethod)
+	}
+
 	rawHashType, ok := args["hash_type"]
 	if !ok {
 		return nil, fmt.Errorf("file serialization args missing `hash_type`")
@@ -215,18 +217,16 @@ func (s *ShardSerialization) Method() string {
 // The returned map contains method, hash_type, shard_size, allow_symlinks,
 // and optionally ignore_paths. Returns a new map with a copy of the ignorePaths slice.
 func (s *ShardSerialization) Parameters() map[string]any {
-	params := map[string]any{
+	pathsCopy := make([]string, len(s.ignorePaths))
+	copy(pathsCopy, s.ignorePaths)
+
+	return map[string]any{
 		"method":         s.Method(),
 		"hash_type":      s.hashType,
 		"shard_size":     s.shardSize,
 		"allow_symlinks": s.allowSymlinks,
+		"ignore_paths":   pathsCopy,
 	}
-	if len(s.ignorePaths) > 0 {
-		pathsCopy := make([]string, len(s.ignorePaths))
-		copy(pathsCopy, s.ignorePaths)
-		params["ignore_paths"] = pathsCopy
-	}
-	return params
 }
 
 // NewItem creates a ManifestItem from a name and digest.
@@ -270,6 +270,10 @@ func shardSerializationFromArgs(args map[string]any) (*ShardSerialization, error
 		shardSize = int64(v)
 	default:
 		return nil, fmt.Errorf("shard serialization `shard_size` must be numeric, got %T", rawShardSize)
+	}
+
+	if shardSize <= 0 {
+		return nil, fmt.Errorf("shard serialization `shard_size` must be a positive integer (spec §6.3.2), got %d", shardSize)
 	}
 
 	rawAllowSymlinks, ok := args["allow_symlinks"]

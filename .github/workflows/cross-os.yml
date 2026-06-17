@@ -48,7 +48,7 @@ jobs:
           for i in {0..3}; do
               echo "This is file f${i} in root." > "${MODEL_ROOT}/f${i}"
           done
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           path: ${{ steps.model.outputs.root }}
           name: model.zip
@@ -69,22 +69,22 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: model.zip
           path: model_root/
-      - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
           go-version-file: './go.mod'
           check-latest: true
       - name: Build model-signing CLI
         run: go build -v -o model-signing${{ matrix.os == 'windows-latest' && '.exe' || '' }} ./cmd/model-signing
-      - name: store beacon token into oidc-token.txt
-        uses: sigstore-conformance/extremely-dangerous-public-oidc-beacon@72d9d63b71e66f36b3e008b8be44ffce84cd2b63 # main
+      - name: Fetch conformance testing OIDC token
+        run: curl --fail --retry 3 --output oidc-token.txt https://storage.googleapis.com/sigstore-conformance-testing-token/untrusted-testing-token.txt
       - name: Sign the model
         run: ./model-signing${{ matrix.os == 'windows-latest' && '.exe' || '' }} sign sigstore "$(pwd)/model_root" --use-staging --signature "$(pwd)/model.sig" --identity-token $(cat oidc-token.txt)
       - name: upload model signature
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ matrix.os }}-model.sig
           path: model.sig
@@ -107,11 +107,11 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: model.zip
           path: model_root/
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ${{ matrix.signed-with-os }}-model.sig
       - name: Debug - Show directory structure
@@ -138,7 +138,7 @@ jobs:
           ls -la model.sig 2>/dev/null || echo "model.sig not found in current directory"
           find . -name "model.sig" 2>/dev/null
       - name: Setup go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
           go-version-file: './go.mod'
           check-latest: true
@@ -147,5 +147,5 @@ jobs:
       - name: Verify the model
         run: |
           ./model-signing${{ matrix.os == 'windows-latest' && '.exe' || '' }} verify sigstore "$(pwd)/model_root" --use-staging --signature "$(pwd)/model.sig" \
-            --identity "https://github.com/sigstore-conformance/extremely-dangerous-public-oidc-beacon/.github/workflows/extremely-dangerous-oidc-beacon.yml@refs/heads/main" \
-            --identity-provider "https://token.actions.githubusercontent.com"
+            --identity "untrusted-sa@sigstore-conformance.iam.gserviceaccount.com" \
+            --identity-provider "https://accounts.google.com"

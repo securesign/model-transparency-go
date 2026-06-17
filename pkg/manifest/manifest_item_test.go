@@ -101,6 +101,56 @@ func TestParseShardNameInvalid(t *testing.T) {
 	}
 }
 
+func TestParseShardNameWithColonsInPath(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantPath  string
+		wantStart int64
+		wantEnd   int64
+	}{
+		{
+			name:      "single colon in path",
+			input:     "file:with:colon:0:1024",
+			wantPath:  "file:with:colon",
+			wantStart: 0,
+			wantEnd:   1024,
+		},
+		{
+			name:      "multiple colons in path",
+			input:     "a:b:c:d:100:200",
+			wantPath:  "a:b:c:d",
+			wantStart: 100,
+			wantEnd:   200,
+		},
+		{
+			name:      "colon at start of path",
+			input:     ":leading:50:75",
+			wantPath:  ":leading",
+			wantStart: 50,
+			wantEnd:   75,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path, start, end, err := parseShardName(tt.input)
+			if err != nil {
+				t.Fatalf("parseShardName(%q) unexpected error: %v", tt.input, err)
+			}
+			if path != tt.wantPath {
+				t.Errorf("path = %q, want %q", path, tt.wantPath)
+			}
+			if start != tt.wantStart {
+				t.Errorf("start = %d, want %d", start, tt.wantStart)
+			}
+			if end != tt.wantEnd {
+				t.Errorf("end = %d, want %d", end, tt.wantEnd)
+			}
+		})
+	}
+}
+
 func TestShardedFileManifestItemRoundTripName(t *testing.T) {
 	d := digests.NewDigest("sha256", []byte{0xAB})
 	item := NewShardedFileManifestItem("foo/bar.bin", 0, 4096, d)
@@ -117,4 +167,56 @@ func TestShardedFileManifestItemRoundTripName(t *testing.T) {
 	if !reflect.DeepEqual(item.Digest().Value(), d.Value()) {
 		t.Fatalf("Digest mismatch after round-trip")
 	}
+}
+
+func TestFileManifestItemPathNormalization(t *testing.T) {
+	d := digests.NewDigest("sha256", []byte{0x01})
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"./config.json", "config.json"},
+		{"subdir/./weights.bin", "subdir/weights.bin"},
+		{"subdir//file", "subdir/file"},
+		{"./a/./b//c", "a/b/c"},
+		{"normal/path.txt", "normal/path.txt"},
+	}
+	for _, tt := range tests {
+		item := NewFileManifestItem(tt.input, d)
+		if got := item.Name(); got != tt.want {
+			t.Errorf("NewFileManifestItem(%q).Name() = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestShardedFileManifestItemPathNormalization(t *testing.T) {
+	d := digests.NewDigest("sha256", []byte{0x01})
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"./file.bin", "file.bin:0:10"},
+		{"dir/./file.bin", "dir/file.bin:0:10"},
+		{"dir//file.bin", "dir/file.bin:0:10"},
+	}
+	for _, tt := range tests {
+		item := NewShardedFileManifestItem(tt.input, 0, 10, d)
+		if got := item.Name(); got != tt.want {
+			t.Errorf("NewShardedFileManifestItem(%q, 0, 10).Name() = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func FuzzParseShardName(f *testing.F) {
+	f.Add("file.bin:0:1024")
+	f.Add("dir/file.bin:100:200")
+	f.Add("path:with:colons:0:10")
+	f.Add(":0:10")
+	f.Add("file:0:")
+	f.Add("")
+	f.Add("no-colons")
+
+	f.Fuzz(func(t *testing.T, name string) {
+		_, _, _, _ = parseShardName(name)
+	})
 }

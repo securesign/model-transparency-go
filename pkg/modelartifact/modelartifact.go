@@ -15,14 +15,24 @@
 package modelartifact
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/sigstore/model-signing/pkg/config"
+	"github.com/sigstore/model-signing/pkg/logging"
 	"github.com/sigstore/model-signing/pkg/manifest"
 	"github.com/sigstore/model-signing/pkg/oci"
 	"github.com/sigstore/model-signing/pkg/utils"
 )
+
+// ErrEmptyModel is returned when a model contains no regular files after
+// applying exclusions. Per spec §6.1, an empty model MUST be rejected.
+var ErrEmptyModel = errors.New("model contains no regular files after exclusions; empty models must be rejected (spec §6.1)")
+
+// ErrInvalidIgnorePath is returned when an ignore path entry contains
+// prohibited patterns per spec §6.2.1.
+var ErrInvalidIgnorePath = errors.New("invalid ignore path")
 
 // Canonicalize walks a model directory (or OCI manifest), hashes all files,
 // and returns a deterministic Manifest.
@@ -35,12 +45,27 @@ import (
 // structure), the manifest is created from the OCI layers instead of walking
 // the filesystem.
 func Canonicalize(modelPath string, opts Options) (*manifest.Manifest, error) {
-	// Handle OCI manifests
-	if oci.IsOCIManifest(modelPath) {
-		return canonicalizeOCI(modelPath, opts)
+	if err := validateIgnorePaths(opts.IgnorePaths); err != nil {
+		return nil, err
 	}
 
-	return canonicalizeDirectory(modelPath, opts)
+	var m *manifest.Manifest
+	var err error
+
+	if oci.IsOCIManifest(modelPath) {
+		m, err = canonicalizeOCI(modelPath, opts)
+	} else {
+		m, err = canonicalizeDirectory(modelPath, opts)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if len(m.ResourceDescriptors()) == 0 {
+		return nil, ErrEmptyModel
+	}
+
+	return m, nil
 }
 
 // Compare checks whether two manifests match. Returns nil if they are equal,
@@ -160,15 +185,40 @@ func buildHashingConfig(opts Options) *config.HashingConfig {
 
 	hc := config.NewHashingConfig()
 
-	if opts.ShardSize > 0 {
-		hc.UseShardSerialization(hashAlgorithm, opts.ShardSize, opts.AllowSymlinks, opts.IgnorePaths)
-	} else {
-		hc.UseFileSerialization(hashAlgorithm, opts.AllowSymlinks, opts.IgnorePaths)
+	// Ignore paths are set once via SetIgnoredPaths; nil is passed to
+	// Use*Serialization so paths are not appended twice.
+	switch {
+	case opts.ShardSize > 0:
+		hc.UseShardSerialization(hashAlgorithm, opts.ShardSize, opts.AllowSymlinks, nil)
+	case opts.ShardSize < 0:
+		hc.UseShardSerialization(hashAlgorithm, DefaultShardSize, opts.AllowSymlinks, nil)
+	default:
+		hc.UseFileSerialization(hashAlgorithm, opts.AllowSymlinks, nil)
 	}
+	hc.SetIgnoredPaths(opts.IgnorePaths, opts.IgnoreGitPaths)
 
-	if opts.IgnoreGitPaths {
-		hc.SetIgnoredPaths(opts.IgnorePaths, true)
-	}
+	hc.SetLogger(logging.EnsureLogger(opts.Logger))
 
 	return hc
+}
+
+// validateIgnorePaths checks that user-provided ignore paths conform to
+// spec §6.2.1: no glob characters, no leading /, no ../ components,
+// and must use / as separator.
+func validateIgnorePaths(paths []string) error {
+	for _, p := range paths {
+		if strings.ContainsAny(p, "*?[") {
+			return fmt.Errorf("%w: must not contain glob characters: %s", ErrInvalidIgnorePath, p)
+		}
+		if strings.HasPrefix(p, "/") {
+			return fmt.Errorf("%w: must not start with /: %s", ErrInvalidIgnorePath, p)
+		}
+		if strings.Contains(p, "../") || p == ".." {
+			return fmt.Errorf("%w: must not contain ../ components: %s", ErrInvalidIgnorePath, p)
+		}
+		if strings.Contains(p, "\\") {
+			return fmt.Errorf("%w: must use / as path separator: %s", ErrInvalidIgnorePath, p)
+		}
+	}
+	return nil
 }

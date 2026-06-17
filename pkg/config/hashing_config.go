@@ -15,17 +15,29 @@
 package config
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 
 	hashengines "github.com/sigstore/model-signing/pkg/hashing/engines"
 	hashio "github.com/sigstore/model-signing/pkg/hashing/engines/io"
 	_ "github.com/sigstore/model-signing/pkg/hashing/engines/memory" // Register default hash engines (sha256, blake2b)
+	"github.com/sigstore/model-signing/pkg/logging"
 	"github.com/sigstore/model-signing/pkg/manifest"
 	"github.com/sigstore/model-signing/pkg/utils"
 )
+
+// ErrSymlinkNotAllowed is returned when a symbolic link is encountered during
+// file enumeration and allow_symlinks is false (the default per OMS spec §6.1.1).
+var ErrSymlinkNotAllowed = errors.New("symbolic link encountered but allow_symlinks is false")
+
+// ErrInvalidUTF8Path is returned when a file path contains byte sequences
+// that are not valid UTF-8 (spec §6.1.2).
+var ErrInvalidUTF8Path = errors.New("file path is not valid UTF-8")
 
 // HashingConfig holds configuration for hashing models.
 //
@@ -51,18 +63,20 @@ type HashingConfig struct {
 
 	// Chunk size for file reading (0 = read all at once)
 	chunkSize int
+
+	// Logger for warnings (e.g. symlink targets outside model root)
+	logger logging.Logger
 }
 
 // PathLike is a type alias for path-like strings.
 type PathLike = string
 
-// gitRelatedPaths defines common git-related paths to ignore during hashing.
+// gitRelatedPaths defines git-related paths excluded by default per spec §6.2.
 var gitRelatedPaths = []string{
 	".git",
 	".gitignore",
 	".gitattributes",
 	".github",
-	".gitmodules",
 }
 
 // NewHashingConfig creates a new hashing configuration with defaults.
@@ -150,23 +164,29 @@ func (c *HashingConfig) SetIgnoredPaths(paths []string, ignoreGitPaths bool) *Ha
 
 // AddIgnoredPaths adds additional paths to the ignore list.
 //
-// The paths are interpreted relative to modelPath.
+// Absolute paths are converted to relative paths using modelPath as
+// the base. All paths are stored as forward-slash POSIX paths per
+// spec §6.2.1 so they are portable across machines and OSes.
 //
 // Parameters:
-//   - modelPath: Base path for resolving relative paths
+//   - modelPath: Base path for resolving absolute paths to relative
 //   - paths: Paths to add to the ignore list (can be absolute or relative)
 //
 // Returns the HashingConfig for method chaining.
 func (c *HashingConfig) AddIgnoredPaths(modelPath string, paths []string) *HashingConfig {
 	for _, p := range paths {
-		// Make path absolute relative to model path if not already absolute
-		var absPath string
+		var relPath string
 		if filepath.IsAbs(p) {
-			absPath = p
+			rel, err := filepath.Rel(modelPath, p)
+			if err != nil {
+				relPath = filepath.ToSlash(p)
+			} else {
+				relPath = filepath.ToSlash(rel)
+			}
 		} else {
-			absPath = filepath.Join(modelPath, p)
+			relPath = filepath.ToSlash(p)
 		}
-		c.ignoredPaths = append(c.ignoredPaths, absPath)
+		c.ignoredPaths = append(c.ignoredPaths, relPath)
 	}
 	return c
 }
@@ -187,6 +207,13 @@ func (c *HashingConfig) SetAllowSymlinks(allow bool) *HashingConfig {
 // Returns the HashingConfig for method chaining.
 func (c *HashingConfig) SetChunkSize(size int) *HashingConfig {
 	c.chunkSize = size
+	return c
+}
+
+// SetLogger sets the logger for warnings during file enumeration
+// (e.g. symlink targets outside model root, symlink cycles).
+func (c *HashingConfig) SetLogger(logger logging.Logger) *HashingConfig {
+	c.logger = logger
 	return c
 }
 
@@ -259,42 +286,62 @@ func (c *HashingConfig) Hash(modelPath string, filesToHash []string) (*manifest.
 // Returns a list of absolute file paths that should be hashed, respecting
 // ignore rules and symlink configuration.
 func (c *HashingConfig) walkDirectory(modelPath string) ([]string, error) {
+	absModelRoot, err := filepath.Abs(modelPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve model path: %w", err)
+	}
+	absModelRoot = filepath.Clean(absModelRoot) + string(filepath.Separator)
+
 	var files []string
 
-	err := filepath.Walk(modelPath, func(path string, info os.FileInfo, err error) error {
+	err = filepath.WalkDir(modelPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		// Skip directories
-		if info.IsDir() {
+		// Check if path should be ignored before other checks so we
+		// can skip entire directory subtrees early via SkipDir.
+		if c.shouldIgnorePath(path, modelPath) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 
-		// Check if it's a symlink
-		if info.Mode()&os.ModeSymlink != 0 {
+		if d.IsDir() {
+			return nil
+		}
+
+		// DirEntry.Type() returns the file type bits without an extra syscall.
+		if d.Type()&os.ModeSymlink != 0 {
 			if !c.allowSymlinks {
-				return nil // Skip symlinks if not allowed
+				relPath, relErr := filepath.Rel(modelPath, path)
+				if relErr != nil {
+					relPath = path
+				}
+				return fmt.Errorf("%w: %s", ErrSymlinkNotAllowed, relPath)
 			}
-			// Resolve symlink and check if target exists
 			target, err := filepath.EvalSymlinks(path)
 			if err != nil {
-				return fmt.Errorf("failed to resolve symlink %s: %w", path, err)
+				// EvalSymlinks fails on cycles (OMS spec §6.1.1)
+				c.warnf("symlink cycle or broken link: %s: %v", path, err)
+				return nil
+			}
+			if !strings.HasPrefix(filepath.Clean(target)+string(filepath.Separator), absModelRoot) {
+				c.warnf("symlink target outside model root: %s -> %s", path, target)
 			}
 			targetInfo, err := os.Stat(target)
 			if err != nil {
 				return fmt.Errorf("failed to stat symlink target %s: %w", target, err)
 			}
-			if targetInfo.IsDir() {
-				return nil // Skip directory symlinks
+			if !targetInfo.Mode().IsRegular() {
+				return nil
 			}
+			files = append(files, path)
+			return nil
 		}
 
-		// Check if path should be ignored
-		if c.shouldIgnorePath(path, modelPath) {
-			if info.IsDir() {
-				return filepath.SkipDir
-			}
+		if !d.Type().IsRegular() {
 			return nil
 		}
 
@@ -370,10 +417,29 @@ func (c *HashingConfig) hashFiles(modelPath string, filePaths []string) ([]manif
 	items := make([]manifest.ManifestItem, 0, len(filePaths))
 
 	for _, filePath := range filePaths {
-		// Get relative path for manifest
 		relPath, err := filepath.Rel(modelPath, filePath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get relative path for %s: %w", filePath, err)
+		}
+
+		if relPath == "." {
+			relPath = filepath.Base(filePath)
+		}
+
+		if !utf8.ValidString(relPath) {
+			return nil, fmt.Errorf("%w: %q", ErrInvalidUTF8Path, relPath)
+		}
+
+		if err := utils.ValidateManifestPath(relPath); err != nil {
+			return nil, err
+		}
+
+		info, err := os.Stat(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to stat %s: %w", filePath, err)
+		}
+		if !info.Mode().IsRegular() {
+			continue
 		}
 
 		// Create file hasher
@@ -404,24 +470,38 @@ func (c *HashingConfig) hashFilesWithShards(modelPath string, filePaths []string
 	items := make([]manifest.ManifestItem, 0)
 
 	for _, filePath := range filePaths {
-		// Get relative path for manifest
 		relPath, err := filepath.Rel(modelPath, filePath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get relative path for %s: %w", filePath, err)
 		}
 
-		// Get file size
+		if relPath == "." {
+			relPath = filepath.Base(filePath)
+		}
+
+		if !utf8.ValidString(relPath) {
+			return nil, fmt.Errorf("%w: %q", ErrInvalidUTF8Path, relPath)
+		}
+
+		if err := utils.ValidateManifestPath(relPath); err != nil {
+			return nil, err
+		}
+
 		fileInfo, err := os.Stat(filePath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to stat %s: %w", filePath, err)
 		}
+		if !fileInfo.Mode().IsRegular() {
+			continue
+		}
 		fileSize := fileInfo.Size()
 
-		// Calculate number of shards (at least 1 for empty files)
-		numShards := (fileSize + c.shardSize - 1) / c.shardSize
-		if numShards == 0 {
-			numShards = 1 // Empty files produce one shard with empty content
+		// Zero-byte files are omitted from resources (spec §6.3.2)
+		if fileSize == 0 {
+			continue
 		}
+
+		numShards := (fileSize + c.shardSize - 1) / c.shardSize
 
 		// Hash each shard
 		for i := int64(0); i < numShards; i++ {
@@ -514,5 +594,11 @@ func (c *HashingConfig) GetSerializationType() manifest.SerializationType {
 			c.allowSymlinks,
 			c.ignoredPaths,
 		)
+	}
+}
+
+func (c *HashingConfig) warnf(format string, args ...interface{}) {
+	if c.logger != nil {
+		c.logger.Warn(format, args...)
 	}
 }

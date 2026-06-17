@@ -15,13 +15,20 @@
 package verify
 
 import (
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
+	"github.com/digitorus/timestamp"
 	"github.com/sigstore/model-signing/pkg/logging"
+	"github.com/sigstore/model-signing/pkg/manifest"
 	"github.com/sigstore/model-signing/pkg/modelartifact"
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 )
@@ -44,6 +51,10 @@ func LoadBundle(path string) (*bundle.Bundle, error) {
 // CompareModelWithBundle extracts the expected manifest from a verified
 // DSSE payload, re-canonicalizes the model, and compares the two manifests.
 //
+// Per OMS spec §8.4, the verifier MUST use the serialization parameters
+// (hash_type, method, shard_size, allow_symlinks, ignore_paths) from the signed bundle
+// when recomputing file digests — not the caller-provided defaults.
+//
 // The verifiedPayload should be the raw in-toto JSON bytes extracted from
 // the DSSE envelope after cryptographic verification by sigstore-go.
 //
@@ -57,13 +68,64 @@ func CompareModelWithBundle(verifiedPayload []byte, modelPath string, opts model
 		return fmt.Errorf("failed to extract manifest from payload: %w", err)
 	}
 
-	// Step 2: Re-canonicalize the model to get the actual manifest
-	actualManifest, err := modelartifact.Canonicalize(modelPath, opts)
+	// Step 2: Extract serialization parameters from the signed bundle
+	// and use them for re-canonicalization (spec §8.4).
+	params := expectedManifest.SerializationParameters()
+	canonOpts := modelartifact.Options{
+		IgnorePaths:    opts.IgnorePaths,
+		IgnoreGitPaths: opts.IgnoreGitPaths,
+		Logger:         opts.Logger,
+	}
+	if ht, ok := params["hash_type"].(string); ok {
+		canonOpts.HashAlgorithm = ht
+	}
+	if as, ok := params["allow_symlinks"].(bool); ok {
+		canonOpts.AllowSymlinks = as
+	}
+	if ip, ok := params["ignore_paths"]; ok {
+		// Bundle records explicit ignore paths — use them and disable
+		// independent git-path addition to avoid deviating from the
+		// signer's exclusion rules (spec §8.4 step 6).
+		canonOpts.IgnoreGitPaths = false
+		switch v := ip.(type) {
+		case []string:
+			canonOpts.IgnorePaths = append(canonOpts.IgnorePaths, v...)
+		case []any:
+			for _, elem := range v {
+				if s, ok := elem.(string); ok {
+					canonOpts.IgnorePaths = append(canonOpts.IgnorePaths, s)
+				}
+			}
+		}
+	}
+	if ss, ok := params["shard_size"]; ok {
+		switch v := ss.(type) {
+		case int64:
+			canonOpts.ShardSize = v
+		case float64:
+			canonOpts.ShardSize = int64(v)
+		case int:
+			canonOpts.ShardSize = int64(v)
+		}
+	}
+	// Validate method per spec §8.4 step 1.
+	if method, ok := params["method"].(string); ok {
+		if method == "shards" && canonOpts.ShardSize == 0 {
+			return fmt.Errorf("bundle specifies shard serialization but shard_size is missing or zero")
+		}
+	}
+
+	// Step 3: Re-canonicalize the model to get the actual manifest
+	actualManifest, err := modelartifact.Canonicalize(modelPath, canonOpts)
 	if err != nil {
 		return fmt.Errorf("failed to canonicalize model: %w", err)
 	}
 
-	// Step 3: Compare manifests
+	// Backward compat: legacy bundles (pre-v1.1) stored "." as the resource
+	// name for single-file models. Normalize to basename for comparison.
+	expectedManifest = normalizeLegacyDotResource(expectedManifest, modelPath)
+
+	// Step 4: Compare manifests
 	if ignoreUnsignedFiles {
 		return modelartifact.CompareIgnoringExtra(actualManifest, expectedManifest)
 	}
@@ -86,12 +148,20 @@ func ExtractAndCompareModel(bndl *bundle.Bundle, modelPath, signaturePath string
 	}
 	payloadBytes := dsseEnvelope.Payload
 
-	ignorePaths := append(append([]string{}, opts.IgnorePaths...), signaturePath)
+	ignorePaths := append([]string{}, opts.IgnorePaths...)
+	if relSig, err := filepath.Rel(modelPath, signaturePath); err == nil && !strings.HasPrefix(relSig, "..") {
+		ignorePaths = append(ignorePaths, filepath.ToSlash(relSig))
+	}
 	compareOpts := modelartifact.Options{
 		IgnorePaths:    ignorePaths,
 		IgnoreGitPaths: opts.IgnoreGitPaths,
-		AllowSymlinks:  opts.AllowSymlinks,
 		Logger:         logger,
+		// HashAlgorithm, ShardSize, AllowSymlinks, and IgnorePaths
+		// are intentionally omitted: CompareModelWithBundle
+		// extracts these from the signed bundle's serialization
+		// parameters (spec §8.4). Caller-provided IgnorePaths
+		// (including the signature file appended above) are
+		// merged with the bundle's ignore_paths.
 	}
 	return CompareModelWithBundle(payloadBytes, modelPath, compareOpts, ignoreUnsignedFiles)
 }
@@ -190,7 +260,7 @@ func extractCertChainFromJSON(data []byte) ([]*x509.Certificate, error) {
 // Transforms applied:
 //  1. Add missing tlogEntries (pre-v1.1.0 bundles omit this field)
 //  2. Strip rawBytes/keyDetails from publicKey (v0.3.1-v1.0.1 key format)
-//     and set hint to empty string if missing
+//     and preserve rawBytes as hint when hint is absent (spec §11.2)
 //  3. Convert x509CertificateChain to singular certificate field
 //     (old Python bundles use the v0.2 cert chain format with a v0.3 mediaType)
 func applyBundleCompat(raw map[string]interface{}) {
@@ -205,9 +275,21 @@ func applyBundleCompat(raw map[string]interface{}) {
 	}
 
 	// 2. Handle old publicKey format: strip rawBytes and keyDetails
+	// (sigstore-go's protojson rejects unknown fields). Compute a
+	// fingerprint from rawBytes to use as hint when hint is absent,
+	// matching the Python signer's sha256(PEM).hex() convention.
 	if pk, ok := vm["publicKey"].(map[string]interface{}); ok {
 		if _, hasHint := pk["hint"]; !hasHint {
-			pk["hint"] = ""
+			if raw, ok := pk["rawBytes"].(string); ok {
+				if pemBytes, err := base64.StdEncoding.DecodeString(raw); err == nil {
+					fingerprint := sha256.Sum256(pemBytes)
+					pk["hint"] = hex.EncodeToString(fingerprint[:])
+				} else {
+					pk["hint"] = ""
+				}
+			} else {
+				pk["hint"] = ""
+			}
 		}
 		delete(pk, "rawBytes")
 		delete(pk, "keyDetails")
@@ -224,4 +306,56 @@ func applyBundleCompat(raw map[string]interface{}) {
 		}
 		delete(vm, "x509CertificateChain")
 	}
+}
+
+// GetTimestampFromBundle extracts the earliest genTime from the RFC 3161
+// timestamps in the bundle's verification material. When multiple timestamps
+// are present, the earliest is used to maximize the certificate validity
+// window. Returns the timestamp and true if a valid timestamp was found,
+// or zero time and false otherwise.
+//
+// NOTE: This parses timestamps directly via digitorus/timestamp rather than
+// using sigstore-go's WithSignedTimestamps() + TrustedMaterial pipeline.
+// This is because the certificate verifier already uses a custom x509.Verify()
+// path (to support x509CertificateChain bundle format), so we extract the
+// timestamp manually to set the verification time. The TSA response itself
+// is not verified against a trust root here. Migrating to sigstore-go's
+// native TSA verification would require reworking the certificate
+// verification path and would remove this direct dependency on
+// digitorus/timestamp.
+func GetTimestampFromBundle(bndl *bundle.Bundle) (time.Time, bool) {
+	timestamps, err := bndl.Timestamps()
+	if err != nil || len(timestamps) == 0 {
+		return time.Time{}, false
+	}
+
+	var earliest time.Time
+	found := false
+	for _, raw := range timestamps {
+		ts, err := timestamp.ParseResponse(raw)
+		if err != nil {
+			continue
+		}
+		if !found || ts.Time.Before(earliest) {
+			earliest = ts.Time
+			found = true
+		}
+	}
+
+	return earliest, found
+}
+
+// normalizeLegacyDotResource handles backward compatibility with pre-v1.1
+// bundles that stored "." as the resource name for single-file models.
+// If the expected manifest has exactly one resource named ".", rebuild it
+// with the model file's basename so comparison succeeds.
+func normalizeLegacyDotResource(expected *manifest.Manifest, modelPath string) *manifest.Manifest {
+	descs := expected.ResourceDescriptors()
+	if len(descs) != 1 || descs[0].Identifier != "." {
+		return expected
+	}
+
+	basename := filepath.Base(modelPath)
+	item := manifest.NewFileManifestItem(basename, descs[0].Digest)
+	return manifest.NewManifest(expected.ModelName(), []manifest.ManifestItem{item}, expected.GetSerializationType())
 }

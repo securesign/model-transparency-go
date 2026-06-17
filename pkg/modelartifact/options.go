@@ -38,6 +38,9 @@ import (
 	"github.com/sigstore/model-signing/pkg/logging"
 )
 
+// DefaultShardSize is the recommended shard size per OMS spec §6.3.2 (1 GB).
+const DefaultShardSize int64 = 1_000_000_000
+
 // Options configures how a model is canonicalized.
 type Options struct {
 	// HashAlgorithm is the hash algorithm to use (default: "sha256").
@@ -48,8 +51,9 @@ type Options struct {
 	// Paths can be absolute or relative to the model root.
 	IgnorePaths []string
 
-	// IgnoreGitPaths automatically excludes .git, .gitignore, .gitattributes,
-	// .github, and .gitmodules from canonicalization.
+	// IgnoreGitPaths controls whether git-related paths (.git, .gitignore,
+	// .gitattributes, .github) are automatically excluded per spec §6.2.
+	// Defaults to false (zero value); the CLI sets this to true by default.
 	IgnoreGitPaths bool
 
 	// AllowSymlinks follows symbolic links instead of skipping them.
@@ -57,8 +61,14 @@ type Options struct {
 
 	// ShardSize enables shard-based serialization if > 0.
 	// When 0 (default), file-based serialization is used where each file
-	// is hashed as a single unit. When > 0, large files are split into
+	// is hashed as a single unit. When set to -1, DefaultShardSize (1 GB)
+	// is used per OMS spec §6.3.2. When > 0, files are split into
 	// fixed-size shards and each shard is hashed separately.
+	//
+	// Values above 2^53 are not supported: the in-toto payload uses
+	// JSON numbers (IEEE 754 float64) which have 53 bits of integer
+	// precision. In practice this is not a limitation since 2^53 bytes
+	// is approximately 9 PB.
 	ShardSize int64
 
 	// Logger is an optional logger for debug output.

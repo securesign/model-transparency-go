@@ -15,10 +15,108 @@
 package key
 
 import (
+	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"encoding/pem"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+func writeECKeyPEM(t *testing.T, dir string, curve elliptic.Curve) string {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(curve, rand.Reader)
+	if err != nil {
+		t.Fatalf("failed to generate EC key: %v", err)
+	}
+	der, err := x509.MarshalECPrivateKey(key)
+	if err != nil {
+		t.Fatalf("failed to marshal EC key: %v", err)
+	}
+	path := filepath.Join(dir, "key.pem")
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if err := pem.Encode(f, &pem.Block{Type: "EC PRIVATE KEY", Bytes: der}); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestNewModelKeypair_ECCurves(t *testing.T) {
+	curves := []struct {
+		name  string
+		curve elliptic.Curve
+	}{
+		{"P-256", elliptic.P256()},
+		{"P-384", elliptic.P384()},
+		{"P-521", elliptic.P521()},
+	}
+
+	for _, tc := range curves {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			keyPath := writeECKeyPEM(t, dir, tc.curve)
+
+			kp, err := NewModelKeypair(keyPath, "")
+			if err != nil {
+				t.Fatalf("NewModelKeypair failed for %s: %v", tc.name, err)
+			}
+
+			if kp.GetKeyAlgorithm() != "ECDSA" {
+				t.Errorf("expected ECDSA, got %s", kp.GetKeyAlgorithm())
+			}
+
+			if len(kp.GetHint()) == 0 {
+				t.Error("expected non-empty key hint")
+			}
+
+			pubPEM, err := kp.GetPublicKeyPem()
+			if err != nil {
+				t.Fatalf("GetPublicKeyPem failed: %v", err)
+			}
+			if pubPEM == "" {
+				t.Error("expected non-empty public key PEM")
+			}
+		})
+	}
+}
+
+func TestModelKeypair_P521_SignData(t *testing.T) {
+	dir := t.TempDir()
+	keyPath := writeECKeyPEM(t, dir, elliptic.P521())
+
+	kp, err := NewModelKeypair(keyPath, "")
+	if err != nil {
+		t.Fatalf("NewModelKeypair failed: %v", err)
+	}
+
+	data := []byte("test payload for P-521 signing")
+	sig, signed, err := kp.SignData(context.Background(), data)
+	if err != nil {
+		t.Fatalf("SignData failed: %v", err)
+	}
+
+	if len(sig) == 0 {
+		t.Error("expected non-empty signature")
+	}
+	if len(signed) == 0 {
+		t.Error("expected non-empty signed data")
+	}
+
+	pubKey, ok := kp.GetPublicKey().(*ecdsa.PublicKey)
+	if !ok {
+		t.Fatal("expected *ecdsa.PublicKey")
+	}
+	if pubKey.Curve != elliptic.P521() {
+		t.Errorf("expected P-521 curve, got %s", pubKey.Curve.Params().Name)
+	}
+}
 
 func TestNewKeySigner_MissingModelPath(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -114,7 +212,7 @@ func TestNewKeySigner_WithIgnorePaths(t *testing.T) {
 	opts := KeySignerOptions{
 		ModelPath:      modelDir,
 		SignaturePath:  filepath.Join(tmpDir, "sig.json"),
-		IgnorePaths:    []string{ignoreDir},
+		IgnorePaths:    []string{"ignored"},
 		IgnoreGitPaths: true,
 		AllowSymlinks:  false,
 		PrivateKeyPath: keyFile,
@@ -148,7 +246,7 @@ func TestNewKeySigner_InvalidIgnorePath(t *testing.T) {
 	opts := KeySignerOptions{
 		ModelPath:      modelDir,
 		SignaturePath:  filepath.Join(tmpDir, "sig.json"),
-		IgnorePaths:    []string{"/nonexistent/path"},
+		IgnorePaths:    []string{"nonexistent/path"},
 		IgnoreGitPaths: false,
 		PrivateKeyPath: keyFile,
 	}
@@ -214,6 +312,7 @@ func TestNewKeySigner_AllOptions(t *testing.T) {
 		AllowSymlinks:  true,
 		PrivateKeyPath: keyFile,
 		Password:       "test-password",
+		TSAUrl:         "https://tsa.example.com",
 	}
 
 	signer, err := NewKeySigner(opts)
@@ -234,5 +333,67 @@ func TestNewKeySigner_AllOptions(t *testing.T) {
 	}
 	if !signer.opts.AllowSymlinks {
 		t.Error("AllowSymlinks not set correctly")
+	}
+	if signer.opts.TSAUrl != "https://tsa.example.com" {
+		t.Errorf("TSAUrl not stored correctly: got %q", signer.opts.TSAUrl)
+	}
+}
+
+func TestNewKeySigner_WithTSAUrl(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	modelDir := filepath.Join(tmpDir, "model")
+	if err := os.MkdirAll(modelDir, 0755); err != nil {
+		t.Fatalf("Failed to create model directory: %v", err)
+	}
+
+	keyFile := filepath.Join(tmpDir, "key.pem")
+	if err := os.WriteFile(keyFile, []byte("dummy"), 0644); err != nil {
+		t.Fatalf("Failed to create key file: %v", err)
+	}
+
+	opts := KeySignerOptions{
+		ModelPath:      modelDir,
+		SignaturePath:  filepath.Join(tmpDir, "sig.json"),
+		PrivateKeyPath: keyFile,
+		TSAUrl:         "https://freetsa.org/tsr",
+	}
+
+	signer, err := NewKeySigner(opts)
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	if signer.opts.TSAUrl != "https://freetsa.org/tsr" {
+		t.Errorf("TSAUrl: got %q, want %q", signer.opts.TSAUrl, "https://freetsa.org/tsr")
+	}
+}
+
+func TestNewKeySigner_EmptyTSAUrl(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	modelDir := filepath.Join(tmpDir, "model")
+	if err := os.MkdirAll(modelDir, 0755); err != nil {
+		t.Fatalf("Failed to create model directory: %v", err)
+	}
+
+	keyFile := filepath.Join(tmpDir, "key.pem")
+	if err := os.WriteFile(keyFile, []byte("dummy"), 0644); err != nil {
+		t.Fatalf("Failed to create key file: %v", err)
+	}
+
+	opts := KeySignerOptions{
+		ModelPath:      modelDir,
+		SignaturePath:  filepath.Join(tmpDir, "sig.json"),
+		PrivateKeyPath: keyFile,
+	}
+
+	signer, err := NewKeySigner(opts)
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	if signer.opts.TSAUrl != "" {
+		t.Errorf("TSAUrl: expected empty, got %q", signer.opts.TSAUrl)
 	}
 }

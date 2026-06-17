@@ -24,7 +24,7 @@ if ! ${DIR}/model-signing \
 	sign key \
 	--signature "${sigfile}" \
 	--private-key ./keys/certificate/signing-key.pem \
-	--ignore-paths "${ignorefile}" \
+	--ignore-paths "$(basename "${ignorefile}")" \
 	"${TMPDIR}"; then
 	echo "Error: 'sign key' failed"
 	exit 1
@@ -34,7 +34,7 @@ if ! ${DIR}/model-signing \
 	verify key \
 	--signature "${sigfile}" \
 	--public-key ./keys/certificate/signing-key-pub.pem \
-	--ignore-paths "${ignorefile}" \
+	--ignore-paths "$(basename "${ignorefile}")" \
 	"${TMPDIR}"; then
 	echo "Error: 'verify key' failed"
 	exit 1
@@ -59,7 +59,7 @@ if ! ${DIR}/model-signing \
 	--private-key ./keys/certificate/signing-key.pem \
 	--signing-certificate ./keys/certificate/signing-key-cert.pem \
 	--certificate-chain ./keys/certificate/int-ca-cert.pem \
-	--ignore-paths "${ignorefile}" \
+	--ignore-paths "$(basename "${ignorefile}")" \
 	"${TMPDIR}"; then
 	echo "Error: 'sign certificate' failed"
 	exit 1
@@ -69,7 +69,7 @@ if ! ${DIR}/model-signing \
 	verify certificate \
 	--signature "${sigfile}" \
 	--certificate-chain ./keys/certificate/ca-cert.pem \
-	--ignore-paths "${ignorefile}" \
+	--ignore-paths "$(basename "${ignorefile}")" \
 	"${TMPDIR}"; then
 	echo "Error: 'verify certificate' failed"
 	exit 1
@@ -175,18 +175,20 @@ if ${DIR}/model-signing \
 	exit 1
 fi
 
-# This should pass without having to pass --allow-symlinks since the symlink
-# will be ignored
+# The bundle was signed with allow_symlinks=false. Per spec §6.1.1 and §8.4,
+# the verifier uses the bundle's allow_symlinks value, so the CLI flag cannot
+# override it. Verification should still fail with symlinks present.
 echo
-echo "Pass signature verification by ignoring any unsigned files or symlinks"
-if ! ${DIR}/model-signing \
+echo "Verify still fails because bundle's allow_symlinks=false overrides CLI flag"
+if ${DIR}/model-signing \
 	verify certificate \
 	--signature "$(basename "${sigfile}")" \
 	--certificate-chain "${DIR}/keys/certificate/ca-cert.pem" \
 	--ignore-paths "$(basename "${ignorefile}")" \
+	--allow-symlinks \
 	--ignore-unsigned-files \
 	. ; then
-	echo "Error: 'verify certificate' failed with --ignore-unsigned-files while passing --allow-symlinks"
+	echo "Error: 'verify certificate' should fail: bundle's allow_symlinks=false rejects symlinks"
 	exit 1
 fi
 
@@ -211,7 +213,7 @@ if ! ${DIR}/model-signing \
 	--private-key "${DIR}/keys/certificate/signing-key.pem" \
 	--signing-certificate "${DIR}/keys/certificate/signing-key-cert.pem" \
 	--certificate-chain "${DIR}/keys/certificate/int-ca-cert.pem" \
-	--ignore-paths "../$(basename "${ignorefile}")" \
+	--ignore-paths "$(basename "${ignorefile}")" \
 	--allow-symlinks \
 	.. ; then
 	echo "Error: 'sign certificate' failed"
@@ -359,7 +361,7 @@ if has_pkcs11_support && command -v softhsm2-util &>/dev/null && command -v p11t
 		sign pkcs11-key \
 		--signature "${pkcs11_sigfile}" \
 		--pkcs11-uri "${pkcs11uri}" \
-		--ignore-paths "${pkcs11_ignorefile}" \
+		--ignore-paths "$(basename "${pkcs11_ignorefile}")" \
 		"${pkcs11_tmpdir}"; then
 		echo "Error: 'sign pkcs11-key' failed"
 		"${DIR}/softhsm_setup" teardown &>/dev/null || true
@@ -373,7 +375,7 @@ if has_pkcs11_support && command -v softhsm2-util &>/dev/null && command -v p11t
 		verify key \
 		--signature "${pkcs11_sigfile}" \
 		--public-key "${pkcs11_pubkey}" \
-		--ignore-paths "${pkcs11_ignorefile}" \
+		--ignore-paths "$(basename "${pkcs11_ignorefile}")" \
 		"${pkcs11_tmpdir}"; then
 		echo "Error: 'verify key' failed on PKCS#11 signature"
 		"${DIR}/softhsm_setup" teardown &>/dev/null || true

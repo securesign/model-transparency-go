@@ -37,11 +37,14 @@ type Pkcs11SignerOptions struct {
 	IgnorePaths            []string
 	IgnoreGitPaths         bool
 	AllowSymlinks          bool
+	HashAlgorithm          string
+	ShardSize              int64
 	URI                    string
 	ModulePaths            []string
 	SigningCertificatePath string
 	CertificateChain       []string
 	Logger                 logging.Logger
+	TSAUrl                 string
 }
 
 // Pkcs11Signer implements ModelSigner using PKCS#11-based signing.
