@@ -47,7 +47,7 @@ RUN set -euo pipefail; \
         -o "model_transparency_cli_otel_linux_${NATIVE_ARCH}" ./cmd/model-signing; \
     tar czf "model_transparency_cli_otel_linux_${NATIVE_ARCH}.tar.gz" "model_transparency_cli_otel_linux_${NATIVE_ARCH}"
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:12db9874bd753eb98b1ab3d840e75de5d6842ac0604fbd68c012adefe97140be
+FROM registry.redhat.io/ubi9-minimal@sha256:1bc3c5c15720506a0cf48adfdf8b623dfe704377e007d7bbae8d14876392ca6a
 
 COPY --from=build-env /opt/app-root/src/model_transparency_cli /usr/local/bin/model_transparency_cli
 COPY --from=build-env /opt/app-root/src/model_transparency_cli_linux_*.tar.gz /usr/local/bin/
