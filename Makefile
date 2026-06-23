@@ -36,7 +36,7 @@ COLOR_BLUE=\033[34m
 .PHONY: all build clean test test-unit test-ci test-coverage coverage-report help deps vet fmt fmt-check lint \
 	docker-build podman-build container-build build-test-binary build-test-binary-otel build-test-binary-pkcs11 \
 	mod-tidy-check license-check docs test-pkcs11 \
-	build-linux build-linux-pkcs11 build-macos build-windows cross-platform
+	build-linux build-linux-pkcs11 build-macos build-windows cross-platform cross-platform-binaries
 
 ## help: Display this help message
 help:
@@ -112,6 +112,10 @@ build-windows:
 	@mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(GOBUILD) -trimpath -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_CLI_NAME)_windows_amd64.exe $(BINARY_PATH)
 	@echo "$(COLOR_GREEN)✓ Binary built: $(BUILD_DIR)/$(BINARY_CLI_NAME)_windows_amd64.exe$(COLOR_RESET)"
+
+## cross-platform-binaries: Build cross-compiled darwin/windows binaries only (for cli-stack)
+cross-platform-binaries: build-macos build-windows
+	@echo "$(COLOR_GREEN)✓ Cross-platform binaries built in $(BUILD_DIR)/$(COLOR_RESET)"
 
 ## cross-platform: Build and gzip for all platforms
 cross-platform: build-linux build-macos build-windows
