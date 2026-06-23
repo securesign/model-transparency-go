@@ -1,7 +1,7 @@
-FROM --platform=linux/amd64   quay.io/securesign/model-transparency-go@sha256:f8295deb20953ea9591b0f02211bb4aa39d88fae1b6eb46c2c5d4156d6715c27 AS build-amd64
-FROM --platform=linux/arm64   quay.io/securesign/model-transparency-go@sha256:3d8506a8b852643d65655611229d65f77adaea7604538653a1223efe91122b92 AS build-arm64
-FROM --platform=linux/ppc64le quay.io/securesign/model-transparency-go@sha256:928348002b9119ea40585573b06141129bd83d7f5e4889e87b0f55e8427c84e0 AS build-ppc64le
-FROM --platform=linux/s390x   quay.io/securesign/model-transparency-go@sha256:2450dab5714b6870cdaf892fbcd06d65a0bc933e6a4acabd4b34b7b7e3781e69 AS build-s390x
+FROM --platform=linux/amd64   quay.io/securesign/model-transparency-go@sha256:37cc1a4ab7f2b492276148a9ba4d8dfdbfcfd3f291156425e8df61b4efc250cf AS build-amd64
+FROM --platform=linux/arm64   quay.io/securesign/model-transparency-go@sha256:37cc1a4ab7f2b492276148a9ba4d8dfdbfcfd3f291156425e8df61b4efc250cf AS build-arm64
+FROM --platform=linux/ppc64le quay.io/securesign/model-transparency-go@sha256:37cc1a4ab7f2b492276148a9ba4d8dfdbfcfd3f291156425e8df61b4efc250cf AS build-ppc64le
+FROM --platform=linux/s390x   quay.io/securesign/model-transparency-go@sha256:37cc1a4ab7f2b492276148a9ba4d8dfdbfcfd3f291156425e8df61b4efc250cf AS build-s390x
 
 FROM registry.redhat.io/ubi9-minimal@sha256:1bc3c5c15720506a0cf48adfdf8b623dfe704377e007d7bbae8d14876392ca6a AS packager
 USER root
