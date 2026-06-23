@@ -1,37 +1,95 @@
-FROM --platform=linux/amd64   quay.io/securesign/model-transparency-go@sha256:f8295deb20953ea9591b0f02211bb4aa39d88fae1b6eb46c2c5d4156d6715c27 AS build-amd64
-FROM --platform=linux/arm64   quay.io/securesign/model-transparency-go@sha256:3d8506a8b852643d65655611229d65f77adaea7604538653a1223efe91122b92 AS build-arm64
-FROM --platform=linux/ppc64le quay.io/securesign/model-transparency-go@sha256:928348002b9119ea40585573b06141129bd83d7f5e4889e87b0f55e8427c84e0 AS build-ppc64le
-FROM --platform=linux/s390x   quay.io/securesign/model-transparency-go@sha256:2450dab5714b6870cdaf892fbcd06d65a0bc933e6a4acabd4b34b7b7e3781e69 AS build-s390x
+FROM registry.redhat.io/ubi9/go-toolset:9.8@sha256:355b23fe885cf565c9313a7e98db742df0aec21456244e808942c56489594251 AS build-cross-platform
+ENV APP_ROOT=/opt/app-root \
+    GOPATH=/opt/app-root
 
-FROM registry.redhat.io/ubi9-minimal@sha256:1bc3c5c15720506a0cf48adfdf8b623dfe704377e007d7bbae8d14876392ca6a AS packager
+USER root
+WORKDIR $APP_ROOT/src
+ADD go.mod go.sum ./
+ADD ./ ./
+
+RUN git config --global --add safe.directory /opt/app-root/src && \
+    git update-index --assume-unchanged Containerfile.model-transparency-go.rh && \
+    git update-index --assume-unchanged Containerfile.cli-stack.rh && \
+    go mod download && \
+    make cross-platform-binaries
+
+FROM --platform=linux/amd64   quay.io/securesign/model-transparency-go@sha256:37cc1a4ab7f2b492276148a9ba4d8dfdbfcfd3f291156425e8df61b4efc250cf AS build-amd64
+FROM --platform=linux/arm64   quay.io/securesign/model-transparency-go@sha256:37cc1a4ab7f2b492276148a9ba4d8dfdbfcfd3f291156425e8df61b4efc250cf AS build-arm64
+FROM --platform=linux/ppc64le quay.io/securesign/model-transparency-go@sha256:37cc1a4ab7f2b492276148a9ba4d8dfdbfcfd3f291156425e8df61b4efc250cf AS build-ppc64le
+FROM --platform=linux/s390x   quay.io/securesign/model-transparency-go@sha256:37cc1a4ab7f2b492276148a9ba4d8dfdbfcfd3f291156425e8df61b4efc250cf AS build-s390x
+
+FROM registry.redhat.io/ubi9/go-toolset:9.8@sha256:355b23fe885cf565c9313a7e98db742df0aec21456244e808942c56489594251 AS packager
 USER root
 RUN mkdir -p /binaries
 
-# Native Linux binaries from each arch variant
-COPY --from=build-amd64   /usr/local/bin/model_transparency_cli_linux_amd64.tar.gz /binaries/
-COPY --from=build-arm64   /usr/local/bin/model_transparency_cli_linux_arm64.tar.gz /binaries/
-COPY --from=build-ppc64le /usr/local/bin/model_transparency_cli_linux_ppc64le.tar.gz /binaries/
-COPY --from=build-s390x   /usr/local/bin/model_transparency_cli_linux_s390x.tar.gz /binaries/
+# Standard CLI: Native Linux binaries from each arch variant
+COPY --from=build-amd64 /usr/local/bin/model_transparency_cli_linux /tmp/model_transparency_cli_linux
+RUN tar -czf /binaries/model_transparency_cli_linux_amd64.tar.gz -C /tmp model_transparency_cli_linux && \
+    rm /tmp/model_transparency_cli_linux
 
-# PKCS11 variants
-COPY --from=build-amd64   /usr/local/bin/model_transparency_cli_pkcs11_linux_amd64.tar.gz /binaries/
-COPY --from=build-arm64   /usr/local/bin/model_transparency_cli_pkcs11_linux_arm64.tar.gz /binaries/
-COPY --from=build-ppc64le /usr/local/bin/model_transparency_cli_pkcs11_linux_ppc64le.tar.gz /binaries/
-COPY --from=build-s390x   /usr/local/bin/model_transparency_cli_pkcs11_linux_s390x.tar.gz /binaries/
+COPY --from=build-arm64 /usr/local/bin/model_transparency_cli_linux /tmp/model_transparency_cli_linux
+RUN tar -czf /binaries/model_transparency_cli_linux_arm64.tar.gz -C /tmp model_transparency_cli_linux && \
+    rm /tmp/model_transparency_cli_linux
 
-# OTel variants
-COPY --from=build-amd64   /usr/local/bin/model_transparency_cli_otel_linux_amd64.tar.gz /binaries/
-COPY --from=build-arm64   /usr/local/bin/model_transparency_cli_otel_linux_arm64.tar.gz /binaries/
-COPY --from=build-ppc64le /usr/local/bin/model_transparency_cli_otel_linux_ppc64le.tar.gz /binaries/
-COPY --from=build-s390x   /usr/local/bin/model_transparency_cli_otel_linux_s390x.tar.gz /binaries/
+COPY --from=build-ppc64le /usr/local/bin/model_transparency_cli_linux /tmp/model_transparency_cli_linux
+RUN tar -czf /binaries/model_transparency_cli_linux_ppc64le.tar.gz -C /tmp model_transparency_cli_linux && \
+    rm /tmp/model_transparency_cli_linux
 
-# Cross-compiled binaries (same across all variants, taken from amd64)
-COPY --from=build-amd64 /usr/local/bin/model_transparency_cli_darwin_amd64.tar.gz /binaries/
-COPY --from=build-amd64 /usr/local/bin/model_transparency_cli_darwin_arm64.tar.gz /binaries/
-COPY --from=build-amd64 /usr/local/bin/model_transparency_cli_windows_amd64.exe.gz /binaries/
+COPY --from=build-s390x /usr/local/bin/model_transparency_cli_linux /tmp/model_transparency_cli_linux
+RUN tar -czf /binaries/model_transparency_cli_linux_s390x.tar.gz -C /tmp model_transparency_cli_linux && \
+    rm /tmp/model_transparency_cli_linux
+
+# PKCS11 CLI: Native Linux binaries from each arch variant
+COPY --from=build-amd64 /usr/local/bin/model_transparency_cli_pkcs11_linux /tmp/model_transparency_cli_pkcs11_linux
+RUN tar -czf /binaries/model_transparency_cli_pkcs11_linux_amd64.tar.gz -C /tmp model_transparency_cli_pkcs11_linux && \
+    rm /tmp/model_transparency_cli_pkcs11_linux
+
+COPY --from=build-arm64 /usr/local/bin/model_transparency_cli_pkcs11_linux /tmp/model_transparency_cli_pkcs11_linux
+RUN tar -czf /binaries/model_transparency_cli_pkcs11_linux_arm64.tar.gz -C /tmp model_transparency_cli_pkcs11_linux && \
+    rm /tmp/model_transparency_cli_pkcs11_linux
+
+COPY --from=build-ppc64le /usr/local/bin/model_transparency_cli_pkcs11_linux /tmp/model_transparency_cli_pkcs11_linux
+RUN tar -czf /binaries/model_transparency_cli_pkcs11_linux_ppc64le.tar.gz -C /tmp model_transparency_cli_pkcs11_linux && \
+    rm /tmp/model_transparency_cli_pkcs11_linux
+
+COPY --from=build-s390x /usr/local/bin/model_transparency_cli_pkcs11_linux /tmp/model_transparency_cli_pkcs11_linux
+RUN tar -czf /binaries/model_transparency_cli_pkcs11_linux_s390x.tar.gz -C /tmp model_transparency_cli_pkcs11_linux && \
+    rm /tmp/model_transparency_cli_pkcs11_linux
+
+# OTel CLI: Native Linux binaries from each arch variant
+COPY --from=build-amd64 /usr/local/bin/model_transparency_cli_otel_linux /tmp/model_transparency_cli_otel_linux
+RUN tar -czf /binaries/model_transparency_cli_otel_linux_amd64.tar.gz -C /tmp model_transparency_cli_otel_linux && \
+    rm /tmp/model_transparency_cli_otel_linux
+
+COPY --from=build-arm64 /usr/local/bin/model_transparency_cli_otel_linux /tmp/model_transparency_cli_otel_linux
+RUN tar -czf /binaries/model_transparency_cli_otel_linux_arm64.tar.gz -C /tmp model_transparency_cli_otel_linux && \
+    rm /tmp/model_transparency_cli_otel_linux
+
+COPY --from=build-ppc64le /usr/local/bin/model_transparency_cli_otel_linux /tmp/model_transparency_cli_otel_linux
+RUN tar -czf /binaries/model_transparency_cli_otel_linux_ppc64le.tar.gz -C /tmp model_transparency_cli_otel_linux && \
+    rm /tmp/model_transparency_cli_otel_linux
+
+COPY --from=build-s390x /usr/local/bin/model_transparency_cli_otel_linux /tmp/model_transparency_cli_otel_linux
+RUN tar -czf /binaries/model_transparency_cli_otel_linux_s390x.tar.gz -C /tmp model_transparency_cli_otel_linux && \
+    rm /tmp/model_transparency_cli_otel_linux
+
+# Cross-compiled binaries
+COPY --from=build-cross-platform /opt/app-root/src/build/model_transparency_cli_darwin_amd64 /tmp/model_transparency_cli_darwin_amd64
+RUN tar -czf /binaries/model_transparency_cli_darwin_amd64.tar.gz -C /tmp model_transparency_cli_darwin_amd64 && \
+    rm /tmp/model_transparency_cli_darwin_amd64
+
+COPY --from=build-cross-platform /opt/app-root/src/build/model_transparency_cli_darwin_arm64 /tmp/model_transparency_cli_darwin_arm64
+RUN tar -czf /binaries/model_transparency_cli_darwin_arm64.tar.gz -C /tmp model_transparency_cli_darwin_arm64 && \
+    rm /tmp/model_transparency_cli_darwin_arm64
+
+COPY --from=build-cross-platform /opt/app-root/src/build/model_transparency_cli_windows_amd64.exe /tmp/model_transparency_cli_windows_amd64.exe
+RUN tar -czf /binaries/model_transparency_cli_windows_amd64.tar.gz -C /tmp model_transparency_cli_windows_amd64.exe && \
+    rm /tmp/model_transparency_cli_windows_amd64.exe
+
+RUN chmod -R a+rX /binaries
 
 # Final minimal image with all binaries
-FROM registry.redhat.io/ubi9-minimal@sha256:1bc3c5c15720506a0cf48adfdf8b623dfe704377e007d7bbae8d14876392ca6a
+FROM registry.redhat.io/ubi9/ubi-micro:9.8@sha256:b498b3ea26111ab4b81d65139f2ebd2ef9a2abb7a4588b7fdcc54889f95e9caa
 
 LABEL description="Flat image containing model-transparency CLI binaries for all platforms and architectures"
 LABEL io.k8s.description="Flat image containing model-transparency CLI binaries for all platforms and architectures"
@@ -40,10 +98,9 @@ LABEL io.k8s.display-name="Model Transparency CLI stack image for Red Hat Truste
 LABEL io.openshift.tags="model-transparency trusted-artifact-signer cli-stack"
 LABEL summary="Provides model-transparency CLI binaries as tar.gz archives for CDN distribution."
 LABEL com.redhat.component="model-transparency-cli-stack"
+LABEL name="rhtas/model-transparency-cli-stack"
 
 COPY --from=packager /binaries/ /binaries/
 COPY --from=build-amd64 /licenses/ /licenses/
-
-RUN chown -R root:0 /binaries && chmod -R g+r /binaries
 
 USER 65532:65532
