@@ -83,7 +83,7 @@ RUN tar -czf /binaries/model_transparency_cli_darwin_arm64.tar.gz -C /tmp model_
     rm /tmp/model_transparency_cli_darwin_arm64
 
 COPY --from=build-cross-platform /opt/app-root/src/build/model_transparency_cli_windows_amd64.exe /tmp/model_transparency_cli_windows_amd64.exe
-RUN tar -czf /binaries/model_transparency_cli_windows_amd64.tar.gz -C /tmp model_transparency_cli_windows_amd64.exe && \
+RUN tar -czf /binaries/model_transparency_cli_windows_amd64.exe.gz -C /tmp model_transparency_cli_windows_amd64.exe && \
     rm /tmp/model_transparency_cli_windows_amd64.exe
 
 RUN chmod -R a+rX /binaries
