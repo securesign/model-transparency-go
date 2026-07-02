@@ -23,7 +23,7 @@ metadata:
 spec:
   params:
   - name: release-version
-    value: "1.4.0"
+    value: "1.4.2"
   - name: git-url
     value: '{{source_url}}'
   - name: revision
@@ -39,7 +39,7 @@ spec:
   - name: hermetic
     value: "true"
   - name: image-version
-    value: "0.0.1"
+    value: "0.0.2"
   - name: prefetch-input
     value: '{"type": "gomod", "path": "."}'
   - name: go_unit_test
