@@ -13,10 +13,10 @@ RUN git config --global --add safe.directory /opt/app-root/src && \
     go mod download && \
     make cross-platform-binaries
 
-FROM --platform=linux/amd64   quay.io/securesign/model-transparency-go@sha256:f5e33ee623166a55366fc0af116cb8171cbefcddd1df02828a49b00e796c1745 AS build-amd64
-FROM --platform=linux/arm64   quay.io/securesign/model-transparency-go@sha256:f5e33ee623166a55366fc0af116cb8171cbefcddd1df02828a49b00e796c1745 AS build-arm64
-FROM --platform=linux/ppc64le quay.io/securesign/model-transparency-go@sha256:f5e33ee623166a55366fc0af116cb8171cbefcddd1df02828a49b00e796c1745 AS build-ppc64le
-FROM --platform=linux/s390x   quay.io/securesign/model-transparency-go@sha256:f5e33ee623166a55366fc0af116cb8171cbefcddd1df02828a49b00e796c1745 AS build-s390x
+FROM --platform=linux/amd64   quay.io/securesign/model-transparency-go@sha256:d8d83f9a988f540681b5c0e83374e347673f583598f9ae2cfa3bfcf6a564f6bf AS build-amd64
+FROM --platform=linux/arm64   quay.io/securesign/model-transparency-go@sha256:70810828217ca64238c5cb0b943cd7c1292cea5fae6e1b0493435d8360848541 AS build-arm64
+FROM --platform=linux/ppc64le quay.io/securesign/model-transparency-go@sha256:96feb93dec1dd0e2049e5fcd7635ade00b3a003a29b77c49239b9e5d91999495 AS build-ppc64le
+FROM --platform=linux/s390x   quay.io/securesign/model-transparency-go@sha256:da29cc4c61aa5689af8019d835bba369ad867638e160868d6eebf6a7aa280930 AS build-s390x
 
 FROM registry.redhat.io/ubi9/go-toolset:9.8-1784190466@sha256:f99dd81b20e5971ef9f63a51ac27cf0aa591ff9921d021490548b67fd9b17144 AS packager
 USER root
