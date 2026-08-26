@@ -67,10 +67,18 @@ echo "Setting up Python environment..."
 python3 -m venv "${VENV}" || exit 1
 source "${VENV}/bin/activate"
 
-# Install model-signing from PyPI with PKCS#11 support (pinned to 1.1.1 for compatibility)
-if ! pip install --quiet 'model-signing[pkcs11]==1.1.1'; then
+# Install model-signing from PyPI (pinned to 1.1.1 for compatibility)
+if ! pip install --quiet 'model-signing==1.1.1'; then
 	echo "Error: Failed to install model-signing Python package"
 	exit 1
+fi
+
+# Try to install PKCS#11 extra; skip PKCS#11 interop tests if it fails
+# (pykcs11 has no manylinux wheels and its source build can fail on Python 3.12+)
+HAVE_PYKCS11=true
+if ! pip install --quiet 'pykcs11' 2>/dev/null; then
+	echo "Warning: pykcs11 failed to install; PKCS#11 interop tests will be skipped"
+	HAVE_PYKCS11=false
 fi
 
 echo -n "Python model_signing version: "
@@ -141,8 +149,10 @@ echo
 # --- PKCS#11 key method ---
 echo "[Go->Python] Testing 'pkcs11-key' method"
 
-# Check if SoftHSM2 is available
-if ! ensure_pkcs11_deps; then
+# Check if SoftHSM2 and pykcs11 are available
+if ! "${HAVE_PYKCS11}"; then
+	echo "  SKIPPED: pykcs11 not available (build failed)"
+elif ! ensure_pkcs11_deps; then
 	echo "  SKIPPED: SoftHSM2 or p11tool not available"
 else
 	echo "  Setting up SoftHSM2..."
@@ -461,8 +471,10 @@ echo
 # --- PKCS#11 key method ---
 echo "[Python->Go] Testing 'pkcs11-key' method"
 
-# Check if SoftHSM2 is available
-if ! ensure_pkcs11_deps; then
+# Check if SoftHSM2 and pykcs11 are available
+if ! "${HAVE_PYKCS11}"; then
+	echo "  SKIPPED: pykcs11 not available (build failed)"
+elif ! ensure_pkcs11_deps; then
 	echo "  SKIPPED: SoftHSM2 or p11tool not available"
 else
 	echo "  Setting up SoftHSM2..."
