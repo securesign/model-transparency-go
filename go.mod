@@ -1,4 +1,4 @@
-module github.com/sigstore/model-signing
+module github.com/securesign/model-transparency-go
 
 go 1.26.3
 

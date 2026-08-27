@@ -85,8 +85,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sigstore/model-signing/pkg/logging"
-	pkcs11Signing "github.com/sigstore/model-signing/pkg/signing/pkcs11"
+	"github.com/securesign/model-transparency-go/pkg/logging"
+	pkcs11Signing "github.com/securesign/model-transparency-go/pkg/signing/pkcs11"
 )
 
 func main() {

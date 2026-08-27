@@ -18,7 +18,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/sigstore/model-signing/pkg/hashing/digests"
+	"github.com/securesign/model-transparency-go/pkg/hashing/digests"
 )
 
 func TestNewFileManifestItemNameAndDigest(t *testing.T) {

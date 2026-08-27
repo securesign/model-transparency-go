@@ -18,9 +18,9 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/sigstore/model-signing/pkg/hashing/digests"
-	"github.com/sigstore/model-signing/pkg/manifest"
-	"github.com/sigstore/model-signing/pkg/utils"
+	"github.com/securesign/model-transparency-go/pkg/hashing/digests"
+	"github.com/securesign/model-transparency-go/pkg/manifest"
+	"github.com/securesign/model-transparency-go/pkg/utils"
 )
 
 // unmarshalPayloadCompat converts a DSSE payload in the v0.2 experimental

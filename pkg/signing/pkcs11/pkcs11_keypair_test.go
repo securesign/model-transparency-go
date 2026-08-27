@@ -23,7 +23,7 @@ import (
 	"crypto/rsa"
 	"testing"
 
-	"github.com/sigstore/model-signing/pkg/signing"
+	"github.com/securesign/model-transparency-go/pkg/signing"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	"github.com/sigstore/sigstore/pkg/signature"
 )

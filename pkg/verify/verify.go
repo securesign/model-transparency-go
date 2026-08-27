@@ -18,8 +18,8 @@ package verify
 import (
 	"context"
 
-	"github.com/sigstore/model-signing/pkg/oci"
-	"github.com/sigstore/model-signing/pkg/utils"
+	"github.com/securesign/model-transparency-go/pkg/oci"
+	"github.com/securesign/model-transparency-go/pkg/utils"
 )
 
 // Result represents the outcome of a verification operation.

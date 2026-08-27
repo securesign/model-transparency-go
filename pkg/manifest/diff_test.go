@@ -17,7 +17,7 @@ package manifest
 import (
 	"testing"
 
-	"github.com/sigstore/model-signing/pkg/hashing/digests"
+	"github.com/securesign/model-transparency-go/pkg/hashing/digests"
 )
 
 func TestComputeDiff_EqualManifests(t *testing.T) {

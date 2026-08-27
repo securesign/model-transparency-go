@@ -27,9 +27,9 @@ import (
 	"time"
 
 	"github.com/digitorus/timestamp"
-	"github.com/sigstore/model-signing/pkg/logging"
-	"github.com/sigstore/model-signing/pkg/manifest"
-	"github.com/sigstore/model-signing/pkg/modelartifact"
+	"github.com/securesign/model-transparency-go/pkg/logging"
+	"github.com/securesign/model-transparency-go/pkg/manifest"
+	"github.com/securesign/model-transparency-go/pkg/modelartifact"
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 )
 

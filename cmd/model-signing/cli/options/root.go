@@ -19,7 +19,7 @@ package options
 import (
 	"time"
 
-	"github.com/sigstore/model-signing/pkg/logging"
+	"github.com/securesign/model-transparency-go/pkg/logging"
 	"github.com/spf13/cobra"
 )
 
