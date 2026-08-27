@@ -24,9 +24,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sigstore/model-signing/pkg/hashing/digests"
-	"github.com/sigstore/model-signing/pkg/manifest"
-	"github.com/sigstore/model-signing/pkg/utils"
+	"github.com/securesign/model-transparency-go/pkg/hashing/digests"
+	"github.com/securesign/model-transparency-go/pkg/manifest"
+	"github.com/securesign/model-transparency-go/pkg/utils"
 )
 
 // ImageManifest represents an OCI image manifest structure.

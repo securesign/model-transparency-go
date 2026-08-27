@@ -19,8 +19,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/sigstore/model-signing/pkg/hashing/digests"
-	hashengines "github.com/sigstore/model-signing/pkg/hashing/engines"
+	"github.com/securesign/model-transparency-go/pkg/hashing/digests"
+	hashengines "github.com/securesign/model-transparency-go/pkg/hashing/engines"
 )
 
 // SimpleFileHasher hashes an entire file by streaming it into an inner StreamingHashEngine.

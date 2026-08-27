@@ -35,7 +35,7 @@
 package modelartifact
 
 import (
-	"github.com/sigstore/model-signing/pkg/logging"
+	"github.com/securesign/model-transparency-go/pkg/logging"
 )
 
 // DefaultShardSize is the recommended shard size per OMS spec §6.3.2 (1 GB).

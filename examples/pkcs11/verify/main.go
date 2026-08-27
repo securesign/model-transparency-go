@@ -54,8 +54,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/sigstore/model-signing/pkg/logging"
-	keyVerify "github.com/sigstore/model-signing/pkg/verify/key"
+	"github.com/securesign/model-transparency-go/pkg/logging"
+	keyVerify "github.com/securesign/model-transparency-go/pkg/verify/key"
 )
 
 func main() {

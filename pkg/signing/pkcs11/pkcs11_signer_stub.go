@@ -24,8 +24,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/sigstore/model-signing/pkg/logging"
-	"github.com/sigstore/model-signing/pkg/signing"
+	"github.com/securesign/model-transparency-go/pkg/logging"
+	"github.com/securesign/model-transparency-go/pkg/signing"
 )
 
 // Pkcs11SignerOptions configures a Pkcs11Signer instance.

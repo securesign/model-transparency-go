@@ -20,10 +20,10 @@ import (
 	"fmt"
 
 	intoto "github.com/in-toto/attestation/go/v1"
-	"github.com/sigstore/model-signing/pkg/hashing/digests"
-	"github.com/sigstore/model-signing/pkg/hashing/engines/memory"
-	"github.com/sigstore/model-signing/pkg/manifest"
-	"github.com/sigstore/model-signing/pkg/utils"
+	"github.com/securesign/model-transparency-go/pkg/hashing/digests"
+	"github.com/securesign/model-transparency-go/pkg/hashing/engines/memory"
+	"github.com/securesign/model-transparency-go/pkg/manifest"
+	"github.com/securesign/model-transparency-go/pkg/utils"
 	"google.golang.org/protobuf/encoding/protojson"
 	structpb "google.golang.org/protobuf/types/known/structpb"
 )

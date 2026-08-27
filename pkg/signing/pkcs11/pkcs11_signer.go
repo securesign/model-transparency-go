@@ -35,11 +35,11 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/sigstore/model-signing/pkg/logging"
-	"github.com/sigstore/model-signing/pkg/modelartifact"
-	"github.com/sigstore/model-signing/pkg/signing"
-	cert "github.com/sigstore/model-signing/pkg/signing/certificate"
-	"github.com/sigstore/model-signing/pkg/utils"
+	"github.com/securesign/model-transparency-go/pkg/logging"
+	"github.com/securesign/model-transparency-go/pkg/modelartifact"
+	"github.com/securesign/model-transparency-go/pkg/signing"
+	cert "github.com/securesign/model-transparency-go/pkg/signing/certificate"
+	"github.com/securesign/model-transparency-go/pkg/utils"
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	sigstoresign "github.com/sigstore/sigstore-go/pkg/sign"
 )

@@ -17,7 +17,7 @@ package memory
 import (
 	"fmt"
 
-	"github.com/sigstore/model-signing/pkg/hashing/digests"
+	"github.com/securesign/model-transparency-go/pkg/hashing/digests"
 )
 
 // ComputeRootDigest computes a SHA256 hash over a sequence of digests.

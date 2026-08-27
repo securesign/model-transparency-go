@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"sort"
 
-	"github.com/sigstore/model-signing/pkg/hashing/digests"
+	"github.com/securesign/model-transparency-go/pkg/hashing/digests"
 )
 
 // ResourceDescriptor describes content from a manifest with an identifier and digest.

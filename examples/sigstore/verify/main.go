@@ -43,8 +43,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/sigstore/model-signing/pkg/logging"
-	sigstoreVerify "github.com/sigstore/model-signing/pkg/verify/sigstore"
+	"github.com/securesign/model-transparency-go/pkg/logging"
+	sigstoreVerify "github.com/securesign/model-transparency-go/pkg/verify/sigstore"
 )
 
 func main() {
