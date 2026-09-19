@@ -19,8 +19,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/sigstore/model-signing/pkg/hashing/digests"
-	hashengines "github.com/sigstore/model-signing/pkg/hashing/engines"
+	"github.com/securesign/model-transparency-go/pkg/hashing/digests"
+	hashengines "github.com/securesign/model-transparency-go/pkg/hashing/engines"
 )
 
 // ShardedFileHasher hashes only a portion (shard) of a file.

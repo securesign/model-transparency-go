@@ -25,8 +25,8 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/sigstore/model-signing/pkg/logging"
-	"github.com/sigstore/model-signing/pkg/utils"
+	"github.com/securesign/model-transparency-go/pkg/logging"
+	"github.com/securesign/model-transparency-go/pkg/utils"
 )
 
 type capturingLogger struct {

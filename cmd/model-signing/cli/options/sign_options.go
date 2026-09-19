@@ -17,10 +17,10 @@ package options
 import (
 	"github.com/spf13/cobra"
 
-	cert "github.com/sigstore/model-signing/pkg/signing/certificate"
-	key "github.com/sigstore/model-signing/pkg/signing/key"
-	pkcs11 "github.com/sigstore/model-signing/pkg/signing/pkcs11"
-	sigstore "github.com/sigstore/model-signing/pkg/signing/sigstore"
+	cert "github.com/securesign/model-transparency-go/pkg/signing/certificate"
+	key "github.com/securesign/model-transparency-go/pkg/signing/key"
+	pkcs11 "github.com/securesign/model-transparency-go/pkg/signing/pkcs11"
+	sigstore "github.com/securesign/model-transparency-go/pkg/signing/sigstore"
 )
 
 // SigstoreSignOptions holds the command-line options for Sigstore-based signing.

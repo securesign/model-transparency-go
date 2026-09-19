@@ -17,9 +17,9 @@ package options
 import (
 	"github.com/spf13/cobra"
 
-	cert "github.com/sigstore/model-signing/pkg/verify/certificate"
-	key "github.com/sigstore/model-signing/pkg/verify/key"
-	sigstore "github.com/sigstore/model-signing/pkg/verify/sigstore"
+	cert "github.com/securesign/model-transparency-go/pkg/verify/certificate"
+	key "github.com/securesign/model-transparency-go/pkg/verify/key"
+	sigstore "github.com/securesign/model-transparency-go/pkg/verify/sigstore"
 )
 
 // SigstoreVerifyOptions holds the command-line options for Sigstore-based verification.

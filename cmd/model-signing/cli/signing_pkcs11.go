@@ -23,10 +23,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/sigstore/model-signing/cmd/model-signing/cli/options"
-	"github.com/sigstore/model-signing/pkg/logging"
-	pkcs11 "github.com/sigstore/model-signing/pkg/signing/pkcs11"
-	"github.com/sigstore/model-signing/pkg/tracing"
+	"github.com/securesign/model-transparency-go/cmd/model-signing/cli/options"
+	"github.com/securesign/model-transparency-go/pkg/logging"
+	pkcs11 "github.com/securesign/model-transparency-go/pkg/signing/pkcs11"
+	"github.com/securesign/model-transparency-go/pkg/tracing"
 )
 
 func init() {

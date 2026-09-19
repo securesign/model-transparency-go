@@ -15,7 +15,7 @@
 package options
 
 import (
-	"github.com/sigstore/model-signing/pkg/logging"
+	"github.com/securesign/model-transparency-go/pkg/logging"
 )
 
 // Observability holds the shared observability configuration for the CLI.

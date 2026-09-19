@@ -21,12 +21,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/sigstore/model-signing/cmd/model-signing/cli/options"
-	"github.com/sigstore/model-signing/pkg/logging"
-	"github.com/sigstore/model-signing/pkg/tracing"
-	cert "github.com/sigstore/model-signing/pkg/verify/certificate"
-	keyverify "github.com/sigstore/model-signing/pkg/verify/key"
-	sigstore "github.com/sigstore/model-signing/pkg/verify/sigstore"
+	"github.com/securesign/model-transparency-go/cmd/model-signing/cli/options"
+	"github.com/securesign/model-transparency-go/pkg/logging"
+	"github.com/securesign/model-transparency-go/pkg/tracing"
+	cert "github.com/securesign/model-transparency-go/pkg/verify/certificate"
+	keyverify "github.com/securesign/model-transparency-go/pkg/verify/key"
+	sigstore "github.com/securesign/model-transparency-go/pkg/verify/sigstore"
 )
 
 // runSigstoreVerify performs Sigstore-based model verification with tracing.

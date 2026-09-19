@@ -17,7 +17,7 @@ package memory
 import (
 	"testing"
 
-	hashengines "github.com/sigstore/model-signing/pkg/hashing/engines"
+	hashengines "github.com/securesign/model-transparency-go/pkg/hashing/engines"
 )
 
 // Test that SHA256 implements StreamingHashEngine at compile time.

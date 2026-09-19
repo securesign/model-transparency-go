@@ -19,11 +19,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sigstore/model-signing/pkg/config"
-	"github.com/sigstore/model-signing/pkg/logging"
-	"github.com/sigstore/model-signing/pkg/manifest"
-	"github.com/sigstore/model-signing/pkg/oci"
-	"github.com/sigstore/model-signing/pkg/utils"
+	"github.com/securesign/model-transparency-go/pkg/config"
+	"github.com/securesign/model-transparency-go/pkg/logging"
+	"github.com/securesign/model-transparency-go/pkg/manifest"
+	"github.com/securesign/model-transparency-go/pkg/oci"
+	"github.com/securesign/model-transparency-go/pkg/utils"
 )
 
 // ErrEmptyModel is returned when a model contains no regular files after

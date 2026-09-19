@@ -45,7 +45,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sigstore/model-signing/pkg/logging"
+	"github.com/securesign/model-transparency-go/pkg/logging"
 )
 
 // stringSlice is a flag.Value that collects repeated --flag values.

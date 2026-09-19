@@ -19,7 +19,7 @@ import (
 	"crypto"
 	"crypto/rand"
 
-	"github.com/sigstore/model-signing/pkg/signing"
+	"github.com/securesign/model-transparency-go/pkg/signing"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	sigstoresig "github.com/sigstore/sigstore/pkg/signature"
 )

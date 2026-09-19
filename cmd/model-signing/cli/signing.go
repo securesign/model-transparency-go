@@ -21,12 +21,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/sigstore/model-signing/cmd/model-signing/cli/options"
-	"github.com/sigstore/model-signing/pkg/logging"
-	cert "github.com/sigstore/model-signing/pkg/signing/certificate"
-	key "github.com/sigstore/model-signing/pkg/signing/key"
-	sigstore "github.com/sigstore/model-signing/pkg/signing/sigstore"
-	"github.com/sigstore/model-signing/pkg/tracing"
+	"github.com/securesign/model-transparency-go/cmd/model-signing/cli/options"
+	"github.com/securesign/model-transparency-go/pkg/logging"
+	cert "github.com/securesign/model-transparency-go/pkg/signing/certificate"
+	key "github.com/securesign/model-transparency-go/pkg/signing/key"
+	sigstore "github.com/securesign/model-transparency-go/pkg/signing/sigstore"
+	"github.com/securesign/model-transparency-go/pkg/tracing"
 )
 
 // additionalSignCommandRegistrations holds subcommands registered by build-tag-gated packages

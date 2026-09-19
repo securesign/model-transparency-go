@@ -21,9 +21,9 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/sigstore/model-signing/pkg/config"
-	"github.com/sigstore/model-signing/pkg/modelartifact"
-	"github.com/sigstore/model-signing/pkg/utils"
+	"github.com/securesign/model-transparency-go/pkg/config"
+	"github.com/securesign/model-transparency-go/pkg/modelartifact"
+	"github.com/securesign/model-transparency-go/pkg/utils"
 )
 
 // hashModel runs canonicalization with optional chunk size and worker count overrides.
