@@ -1,6 +1,6 @@
 module github.com/securesign/model-transparency-go
 
-go 1.27.0
+go 1.26.7
 
 require (
 	github.com/ThalesGroup/crypto11 v1.6.2
@@ -11,7 +11,7 @@ require (
 	github.com/mitchellh/go-wordwrap v1.0.1
 	github.com/moby/term v0.5.2
 	github.com/sigstore/protobuf-specs v0.5.2
-	github.com/sigstore/sigstore v1.10.10
+	github.com/sigstore/sigstore v1.10.9
 	github.com/sigstore/sigstore-go v1.3.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
