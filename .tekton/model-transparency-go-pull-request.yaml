@@ -39,7 +39,7 @@ spec:
   - name: hermetic
     value: "true"
   - name: image-version
-    value: "0.0.1"
+    value: "1.0.0"
   - name: prefetch-input
     value: '{"type": "gomod", "path": "."}'
   - name: go_unit_test
