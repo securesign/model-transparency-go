@@ -1,4 +1,4 @@
-FROM registry.redhat.io/ubi9/go-toolset:9.8-1789040808@sha256:685ccca486cc2c82b0818d835abecb1aed7a396e76ba416cfc47c28067f5d365 AS build-cross-platform
+FROM registry.redhat.io/ubi9/go-toolset:9.8-1790174511@sha256:0a4666f7a4eb0644c97a73cba198eb268691b270d97831822689e7a2088f87be AS build-cross-platform
 ENV APP_ROOT=/opt/app-root \
     GOPATH=/opt/app-root
 
@@ -18,7 +18,7 @@ FROM --platform=linux/arm64   quay.io/securesign/model-transparency-go@sha256:d9
 FROM --platform=linux/ppc64le quay.io/securesign/model-transparency-go@sha256:6eaccb73d2d0b89a79ab54a1bc3562c7e66bfb48c8d48f59af99d34a52c95ed0 AS build-ppc64le
 FROM --platform=linux/s390x   quay.io/securesign/model-transparency-go@sha256:95c70f745d583d3d0595b6795055b27b718ba5ca6d7bb0628f011b738151b95f AS build-s390x
 
-FROM registry.redhat.io/ubi9/go-toolset:9.8-1789040808@sha256:685ccca486cc2c82b0818d835abecb1aed7a396e76ba416cfc47c28067f5d365 AS packager
+FROM registry.redhat.io/ubi9/go-toolset:9.8-1790174511@sha256:0a4666f7a4eb0644c97a73cba198eb268691b270d97831822689e7a2088f87be AS packager
 USER root
 RUN mkdir -p /binaries
 
@@ -89,7 +89,7 @@ RUN tar -czf /binaries/model_transparency_cli_windows_amd64.exe.gz -C /tmp model
 RUN chmod -R a+rX /binaries
 
 # Final minimal image with all binaries
-FROM registry.redhat.io/ubi9/ubi-micro:9.8-1787778798@sha256:f332c99eb8f798a8486821c91937f10ad64ee83d7e739303be2df051040918f6
+FROM registry.redhat.io/ubi9/ubi-micro:9.8-1789345812@sha256:7a0454cbd9bd847e8f6a63b6f0254a6efbeb6e0ed71a5d824a4f6cccbe626650
 
 LABEL description="Flat image containing model-transparency CLI binaries for all platforms and architectures"
 LABEL io.k8s.description="Flat image containing model-transparency CLI binaries for all platforms and architectures"
