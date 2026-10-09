@@ -9,21 +9,21 @@ metadata:
     pipelinesascode.tekton.dev/cancel-in-progress: "true"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
-      == "main" && (".tekton/model-transparency-go-pull-request.yaml".pathChanged() || "cmd/model-signing/***".pathChanged()
+      == "release-1.0" && (".tekton/model-transparency-go-pull-request.yaml".pathChanged() || "cmd/model-signing/***".pathChanged()
       || "pkg/***".pathChanged() || "Makefile".pathChanged() || "Containerfile.model-transparency-go.rh".pathChanged()
       || "go.mod".pathChanged() || "go.sum".pathChanged() || "internal/***".pathChanged()
       )
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: model-transparency-go
-    appstudio.openshift.io/component: model-transparency-go
+    appstudio.openshift.io/application: model-transparency-go-v1-0
+    appstudio.openshift.io/component: model-transparency-go-v1-0
     pipelines.appstudio.openshift.io/type: build
-  name: model-transparency-go-on-pull-request
+  name: model-transparency-go-v1-0-on-pull-request
   namespace: rhtas-tenant
 spec:
   params:
   - name: release-version
-    value: "1.5.0"
+    value: "1.5.1"
   - name: git-url
     value: '{{source_url}}'
   - name: revision
@@ -39,7 +39,7 @@ spec:
   - name: hermetic
     value: "true"
   - name: image-version
-    value: "1.0.0"
+    value: "1.0.1"
   - name: prefetch-input
     value: '{"type": "gomod", "path": "."}'
   - name: go_unit_test
@@ -77,7 +77,7 @@ spec:
           memory: 5Gi
       name: run-tests
   taskRunTemplate:
-    serviceAccountName: build-pipeline-model-transparency-go
+    serviceAccountName: build-pipeline-model-transparency-go-v1-0
   workspaces:
   - name: git-auth
     secret:
