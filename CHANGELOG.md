@@ -5,9 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [v1.0.1] - 2026-11-05
 
-- Added JSON input support to the CLI, including schema validation, stdin support, CLI precedence, and integration coverage.
+### Changed
+
+- Security fixes.
+
+## [v1.0.0] - 2026-09-23
+
+### Added
+
+- Added a global `--json` flag for supplying command parameters inline, from a file, or through stdin. Repeated inputs merge, explicit CLI flags take precedence, invalid keys are rejected, and a JSON Schema is provided.
+- Added a CLI stack image bundling standard, PKCS#11, and OpenTelemetry binaries for Linux, macOS, and Windows.
+- Added a tag-triggered workflow that runs tests, creates a GitHub release, and triggers Go module proxy indexing.
+
+### Fixed
+
+- Normalized underscores and hyphens in CLI flag names for compatibility with the Python `model_signing` CLI.
+- Fixed PKCS#11 build compatibility with Python 3.12+ and restored the Windows CLI archive filename convention.
 
 ## [v0.0.3] - 2026-06-16
 
@@ -36,6 +51,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reusable library packages for external integration.
 - Example programs for each signing method.
 
+[v1.0.1]: https://github.com/securesign/model-transparency-go/releases/tag/v1.0.1
+[v1.0.0]: https://github.com/securesign/model-transparency-go/releases/tag/v1.0.0
 [v0.0.3]: https://github.com/sampras343/model-transparency-go/releases/tag/v0.0.3
 [v0.0.2]: https://github.com/sampras343/model-transparency-go/releases/tag/v0.0.2
 [v0.0.1]: https://github.com/sampras343/model-transparency-go/releases/tag/v0.0.1
