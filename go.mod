@@ -3,27 +3,27 @@ module github.com/securesign/model-transparency-go
 go 1.26.7
 
 require (
-	github.com/ThalesGroup/crypto11 v1.6.2
+	github.com/ThalesGroup/crypto11 v1.6.8
 	github.com/coreos/go-oidc/v3 v3.21.0
-	github.com/digitorus/timestamp v0.0.0-20250524132541-c45532741eea
+	github.com/digitorus/timestamp v0.0.0-20260914073129-b4b58b92aa51
 	github.com/google/go-containerregistry v0.22.1
 	github.com/in-toto/attestation v1.2.0
 	github.com/mitchellh/go-wordwrap v1.0.1
 	github.com/moby/term v0.5.2
 	github.com/sigstore/protobuf-specs v0.5.2
-	github.com/sigstore/sigstore v1.10.9
-	github.com/sigstore/sigstore-go v1.3.0
+	github.com/sigstore/sigstore v1.11.3
+	github.com/sigstore/sigstore-go v1.4.0
 	github.com/spf13/cobra v1.10.2
-	github.com/spf13/pflag v1.0.10
+	github.com/spf13/pflag v1.1.0
 	github.com/withfig/autocomplete-tools/integrations/cobra v1.2.1
 	go.opentelemetry.io/otel v1.47.0
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.46.0 // optional
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.47.0 // optional
 	go.opentelemetry.io/otel/sdk v1.47.0 // optional
 	go.opentelemetry.io/otel/trace v1.47.0
 	golang.org/x/crypto v0.57.0
-	golang.org/x/oauth2 v0.37.0
+	golang.org/x/oauth2 v0.38.0
 	google.golang.org/protobuf v1.36.12
-	sigs.k8s.io/release-utils v0.12.4
+	sigs.k8s.io/release-utils v0.12.5
 )
 
 require (
