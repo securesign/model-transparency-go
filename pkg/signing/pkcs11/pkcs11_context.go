@@ -28,7 +28,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ThalesGroup/crypto11"
+	"github.com/eclipse-keypont/crypto11/v2"
 )
 
 // Context wraps a crypto11 context for managing PKCS#11 sessions.
