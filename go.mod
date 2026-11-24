@@ -3,9 +3,9 @@ module github.com/securesign/model-transparency-go
 go 1.27.3
 
 require (
-	github.com/ThalesGroup/crypto11 v1.6.7
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/digitorus/timestamp v0.0.0-20260914073129-b4b58b92aa51
+	github.com/eclipse-keypont/crypto11/v2 v2.0.0-rc10
 	github.com/google/go-containerregistry v0.22.1
 	github.com/in-toto/attestation v1.2.0
 	github.com/mitchellh/go-wordwrap v1.0.1
@@ -37,6 +37,7 @@ require (
 	github.com/common-nighthawk/go-figure v0.0.0-20210622060536-734e95fb86be // indirect
 	github.com/cyberphone/json-canonicalization v0.0.0-20261011152517-32a48195b9b2 // indirect
 	github.com/digitorus/pkcs7 v0.0.0-20261104125046-a476de3098e4 // indirect
+	github.com/eclipse-keypont/pkcs11-go v1.2.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.9 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -66,7 +67,6 @@ require (
 	github.com/in-toto/in-toto-golang v0.11.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jedisct1/go-minisign v0.0.0-20260527172527-a09352b57a22 // indirect
-	github.com/miekg/pkcs11 v1.1.2 // indirect
 	github.com/oklog/ulid/v2 v2.1.2 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
@@ -77,7 +77,6 @@ require (
 	github.com/sigstore/rekor v1.6.5 // indirect
 	github.com/sigstore/rekor-tiles/v2 v2.4.6 // indirect
 	github.com/sigstore/timestamp-authority/v2 v2.2.2 // indirect
-	github.com/thales-e-security/pool v0.0.2 // indirect
 	github.com/theupdateframework/go-tuf v0.7.1 // indirect
 	github.com/theupdateframework/go-tuf/v2 v2.4.2 // indirect
 	github.com/transparency-dev/formats v0.1.1 // indirect
