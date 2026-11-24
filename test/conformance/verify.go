@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/sigstore/model-signing/pkg/logging"
-	verifycert "github.com/sigstore/model-signing/pkg/verify/certificate"
-	verifykey "github.com/sigstore/model-signing/pkg/verify/key"
+	"github.com/securesign/model-transparency-go/pkg/logging"
+	verifycert "github.com/securesign/model-transparency-go/pkg/verify/certificate"
+	verifykey "github.com/securesign/model-transparency-go/pkg/verify/key"
 )
 
 func verifyModel(args []string) int {

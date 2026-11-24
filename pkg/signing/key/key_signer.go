@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/sigstore/model-signing/pkg/logging"
-	"github.com/sigstore/model-signing/pkg/modelartifact"
-	"github.com/sigstore/model-signing/pkg/signing"
-	"github.com/sigstore/model-signing/pkg/utils"
+	"github.com/securesign/model-transparency-go/pkg/logging"
+	"github.com/securesign/model-transparency-go/pkg/modelartifact"
+	"github.com/securesign/model-transparency-go/pkg/signing"
+	"github.com/securesign/model-transparency-go/pkg/utils"
 
 	sigstoresign "github.com/sigstore/sigstore-go/pkg/sign"
 )

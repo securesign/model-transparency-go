@@ -64,8 +64,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sigstore/model-signing/pkg/logging"
-	certSigning "github.com/sigstore/model-signing/pkg/signing/certificate"
+	"github.com/securesign/model-transparency-go/pkg/logging"
+	certSigning "github.com/securesign/model-transparency-go/pkg/signing/certificate"
 )
 
 func main() {

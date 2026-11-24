@@ -31,7 +31,7 @@ import (
 	"time"
 
 	"github.com/digitorus/timestamp"
-	"github.com/sigstore/model-signing/pkg/modelartifact"
+	"github.com/securesign/model-transparency-go/pkg/modelartifact"
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	sigbundle "github.com/sigstore/sigstore-go/pkg/bundle"

@@ -21,7 +21,7 @@ import (
 	"text/template"
 	"unicode"
 
-	"github.com/sigstore/model-signing/cmd/model-signing/cli/templates/term"
+	"github.com/securesign/model-transparency-go/cmd/model-signing/cli/templates/term"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 )

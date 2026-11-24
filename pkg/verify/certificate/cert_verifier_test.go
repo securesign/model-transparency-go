@@ -18,7 +18,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/sigstore/model-signing/pkg/logging"
+	"github.com/securesign/model-transparency-go/pkg/logging"
 )
 
 // TestNewCertificateVerifier tests the creation of a certificate verifier.

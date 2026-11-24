@@ -80,7 +80,7 @@ func InitFromEnv() error {
 	otelTracerProvider = tp
 	otel.SetTracerProvider(tp)
 
-	SetTracer(&otelTracer{tracer: tp.Tracer("github.com/sigstore/model-signing")})
+	SetTracer(&otelTracer{tracer: tp.Tracer("github.com/securesign/model-transparency-go")})
 	return nil
 }
 

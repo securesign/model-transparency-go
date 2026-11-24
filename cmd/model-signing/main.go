@@ -23,8 +23,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/sigstore/model-signing/cmd/model-signing/cli"
-	"github.com/sigstore/model-signing/pkg/tracing"
+	"github.com/securesign/model-transparency-go/cmd/model-signing/cli"
+	"github.com/securesign/model-transparency-go/pkg/tracing"
 )
 
 // ExitCoder represents an error that carries a specific exit code.

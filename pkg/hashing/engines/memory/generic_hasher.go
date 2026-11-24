@@ -23,8 +23,8 @@ package memory
 import (
 	"hash"
 
-	"github.com/sigstore/model-signing/pkg/hashing/digests"
-	hashengines "github.com/sigstore/model-signing/pkg/hashing/engines"
+	"github.com/securesign/model-transparency-go/pkg/hashing/digests"
+	hashengines "github.com/securesign/model-transparency-go/pkg/hashing/engines"
 )
 
 // Ensure GenericHashEngine implements StreamingHashEngine at compile time.

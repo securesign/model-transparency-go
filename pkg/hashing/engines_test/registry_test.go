@@ -18,8 +18,8 @@ import (
 	"reflect"
 	"testing"
 
-	hashengines "github.com/sigstore/model-signing/pkg/hashing/engines"
-	"github.com/sigstore/model-signing/pkg/hashing/engines/memory"
+	hashengines "github.com/securesign/model-transparency-go/pkg/hashing/engines"
+	"github.com/securesign/model-transparency-go/pkg/hashing/engines/memory"
 )
 
 func TestCreate(t *testing.T) {

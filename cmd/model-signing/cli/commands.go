@@ -22,9 +22,9 @@ import (
 	"strings"
 
 	"github.com/google/go-containerregistry/pkg/logs"
-	"github.com/sigstore/model-signing/cmd/model-signing/cli/options"
-	"github.com/sigstore/model-signing/cmd/model-signing/cli/templates"
-	"github.com/sigstore/model-signing/pkg/logging"
+	"github.com/securesign/model-transparency-go/cmd/model-signing/cli/options"
+	"github.com/securesign/model-transparency-go/cmd/model-signing/cli/templates"
+	"github.com/securesign/model-transparency-go/pkg/logging"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	cobracompletefig "github.com/withfig/autocomplete-tools/integrations/cobra"

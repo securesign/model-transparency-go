@@ -20,9 +20,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sigstore/model-signing/pkg/logging"
-	"github.com/sigstore/model-signing/pkg/manifest"
-	"github.com/sigstore/model-signing/pkg/modelartifact"
+	"github.com/securesign/model-transparency-go/pkg/logging"
+	"github.com/securesign/model-transparency-go/pkg/manifest"
+	"github.com/securesign/model-transparency-go/pkg/modelartifact"
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 	sigstoresign "github.com/sigstore/sigstore-go/pkg/sign"

@@ -20,7 +20,7 @@
 package hashengines
 
 import (
-	"github.com/sigstore/model-signing/pkg/hashing/digests"
+	"github.com/securesign/model-transparency-go/pkg/hashing/digests"
 )
 
 // HashEngine defines the core interface for computing cryptographic hashes.

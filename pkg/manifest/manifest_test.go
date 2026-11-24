@@ -17,7 +17,7 @@ package manifest
 import (
 	"testing"
 
-	"github.com/sigstore/model-signing/pkg/hashing/digests"
+	"github.com/securesign/model-transparency-go/pkg/hashing/digests"
 )
 
 func newTestDigest(alg string, b byte) digests.Digest {

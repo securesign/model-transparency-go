@@ -57,8 +57,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/sigstore/model-signing/pkg/logging"
-	keySigning "github.com/sigstore/model-signing/pkg/signing/key"
+	"github.com/securesign/model-transparency-go/pkg/logging"
+	keySigning "github.com/securesign/model-transparency-go/pkg/signing/key"
 )
 
 func main() {

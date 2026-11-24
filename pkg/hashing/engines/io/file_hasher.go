@@ -20,7 +20,7 @@
 package io
 
 import (
-	hashengines "github.com/sigstore/model-signing/pkg/hashing/engines"
+	hashengines "github.com/securesign/model-transparency-go/pkg/hashing/engines"
 )
 
 // FileHasher is a marker interface for hash engines that operate on files.

@@ -23,12 +23,12 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	hashengines "github.com/sigstore/model-signing/pkg/hashing/engines"
-	hashio "github.com/sigstore/model-signing/pkg/hashing/engines/io"
-	_ "github.com/sigstore/model-signing/pkg/hashing/engines/memory" // Register default hash engines (sha256, blake2b)
-	"github.com/sigstore/model-signing/pkg/logging"
-	"github.com/sigstore/model-signing/pkg/manifest"
-	"github.com/sigstore/model-signing/pkg/utils"
+	hashengines "github.com/securesign/model-transparency-go/pkg/hashing/engines"
+	hashio "github.com/securesign/model-transparency-go/pkg/hashing/engines/io"
+	_ "github.com/securesign/model-transparency-go/pkg/hashing/engines/memory" // Register default hash engines (sha256, blake2b)
+	"github.com/securesign/model-transparency-go/pkg/logging"
+	"github.com/securesign/model-transparency-go/pkg/manifest"
+	"github.com/securesign/model-transparency-go/pkg/utils"
 )
 
 // ErrSymlinkNotAllowed is returned when a symbolic link is encountered during

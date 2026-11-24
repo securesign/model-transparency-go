@@ -17,7 +17,7 @@ package manifest
 import (
 	"fmt"
 
-	"github.com/sigstore/model-signing/pkg/hashing/digests"
+	"github.com/securesign/model-transparency-go/pkg/hashing/digests"
 )
 
 // SerializationType describes the serialization process that generated a manifest.
