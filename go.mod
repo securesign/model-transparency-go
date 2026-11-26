@@ -3,22 +3,22 @@ module github.com/sigstore/model-signing
 go 1.25.9
 
 require (
-	github.com/ThalesGroup/crypto11 v1.6.2
-	github.com/coreos/go-oidc/v3 v3.20.0
-	github.com/google/go-containerregistry v0.21.7
+	github.com/ThalesGroup/crypto11 v1.6.8
+	github.com/coreos/go-oidc/v3 v3.21.0
+	github.com/google/go-containerregistry v0.22.1
 	github.com/in-toto/attestation v1.2.0
 	github.com/mitchellh/go-wordwrap v1.0.1
 	github.com/moby/term v0.5.2
-	github.com/sigstore/protobuf-specs v0.5.1
-	github.com/sigstore/sigstore v1.10.8
-	github.com/sigstore/sigstore-go v1.2.2
+	github.com/sigstore/protobuf-specs v0.5.2
+	github.com/sigstore/sigstore v1.11.4
+	github.com/sigstore/sigstore-go v1.4.1
 	github.com/spf13/cobra v1.10.2
-	github.com/spf13/pflag v1.0.10
+	github.com/spf13/pflag v1.1.0
 	github.com/withfig/autocomplete-tools/integrations/cobra v1.2.1
 	golang.org/x/crypto v0.54.0
-	golang.org/x/oauth2 v0.36.0
-	google.golang.org/protobuf v1.36.11
-	sigs.k8s.io/release-utils v0.12.4
+	golang.org/x/oauth2 v0.38.0
+	google.golang.org/protobuf v1.36.12
+	sigs.k8s.io/release-utils v0.12.5
 )
 
 require (
