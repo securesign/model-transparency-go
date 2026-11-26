@@ -13,7 +13,14 @@
 # limitations under the License.
 
 name: 'Dependency Review'
-on: [pull_request]
+on:
+  pull_request:
+    branches: [main, release-1.0, tech-preview]
+    paths-ignore:
+      - 'Containerfile.cli-stack.rh'
+      - 'Containerfile.model-transparency-go.rh'
+      - '.tekton/**'
+      - 'renovate.json'
 
 permissions:
   contents: read
