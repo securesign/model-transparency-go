@@ -26,7 +26,13 @@ on:
   schedule:
     - cron: '34 20 * * 1'
   push:
-    branches: [ "main" ]
+    # Scorecard rejects push events outside the default branch.
+    branches: [main]
+    paths-ignore:
+      - 'Containerfile.cli-stack.rh'
+      - 'Containerfile.model-transparency-go.rh'
+      - '.tekton/**'
+      - 'renovate.json'
 
 # Declare default permissions as read only.
 permissions: read-all
