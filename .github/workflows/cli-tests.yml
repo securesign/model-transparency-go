@@ -15,11 +15,15 @@
 name: Run CLI tests
 on:
   pull_request:
-    branches: [main]
+    branches: [main, release-1.0, tech-preview]
     types: [opened, synchronize]
     paths-ignore:
       - '**/*.md'
       - '*.md'
+      - 'Containerfile.cli-stack.rh'
+      - 'Containerfile.model-transparency-go.rh'
+      - '.tekton/**'
+      - 'renovate.json'
   workflow_dispatch:
 
 permissions: {}
