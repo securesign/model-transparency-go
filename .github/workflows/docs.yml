@@ -16,11 +16,20 @@ name: Documentation
 
 on:
   push:
-    branches: [tech-preview]
+    branches: [main, release-1.0, tech-preview]
+    paths-ignore:
+      - 'Containerfile.cli-stack.rh'
+      - 'Containerfile.model-transparency-go.rh'
+      - '.tekton/**'
+      - 'renovate.json'
 
   pull_request:
-    branches: [tech-preview]
-    
+    branches: [main, release-1.0, tech-preview]
+    paths-ignore:
+      - 'Containerfile.cli-stack.rh'
+      - 'Containerfile.model-transparency-go.rh'
+      - '.tekton/**'
+      - 'renovate.json'
 permissions: {}
 
 jobs:
@@ -42,7 +51,7 @@ jobs:
         run: make docs
 
       - name: Upload docs artifact
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
         with:
           path: ./html/
